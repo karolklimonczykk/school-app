@@ -46,7 +46,7 @@ model Student {
   firstName String
   lastName  String
   gender    String
-  class     Class   @relation(fields: [classId], references: [id])
+  class     Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
   classId   Int
   order     Int
   results   TestResult[]

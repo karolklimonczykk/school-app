@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
-
+import { Link } from "react-router-dom";
 // Typ klasy (dopasuj do modelu w Prisma!)
 type SchoolClass = {
   id: number;
@@ -123,7 +123,7 @@ const SchoolDetails: React.FC = () => {
       <ul>
         {classes.map(cls => (
           <li key={cls.id}>
-            {cls.name}{" "}
+            <Link to={`/schools/${id}/classes/${cls.id}`}>{cls.name}</Link>
             <button onClick={() => handleEditClass(cls.id)}>Edytuj</button>{" "}
             <button onClick={() => handleDeleteClass(cls.id)}>Usuń</button>
           </li>

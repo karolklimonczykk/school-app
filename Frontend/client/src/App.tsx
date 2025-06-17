@@ -5,6 +5,7 @@ import Register from "./pages/Register";
 import Schools from "./pages/Schools";
 import LogoutButton from "./components/LogoutButton";
 import SchoolDetails from "./pages/SchoolDetails";
+import ClassDetails from "./pages/ClassDetails";
 
 const App: React.FC = () => {
   // isLoggedIn w stanie Reacta
@@ -55,6 +56,13 @@ const App: React.FC = () => {
           isLoggedIn ? <SchoolDetails /> : <Navigate to="/login" replace />
         }
         />
+        <Route 
+          path="/schools/:schoolId/classes/:classId" 
+          element=
+          {isLoggedIn ? <ClassDetails /> : <Navigate to="/login" replace />
+            
+          } 
+          />
       </Routes>
     </Router>
   );
