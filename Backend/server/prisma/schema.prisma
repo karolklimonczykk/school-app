@@ -1,0 +1,102 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  schools   School[]
+  templates TestTemplate[]
+  tests     Test[]
+}
+
+model School {
+  id      Int     @id @default(autoincrement())
+  name    String
+  owner   User    @relation(fields: [ownerId], references: [id])
+  ownerId Int
+  classes Class[]
+  tests   Test[]
+}
+
+model Class {
+  id       Int      @id @default(autoincrement())
+  name     String
+  school   School   @relation(fields: [schoolId], references: [id])
+  schoolId Int
+  students Student[]
+  order    Int
+  tests    Test[]
+}
+
+model Student {
+  id       Int     @id @default(autoincrement())
+  firstName String
+  lastName  String
+  gender    String
+  class     Class   @relation(fields: [classId], references: [id])
+  classId   Int
+  order     Int
+  results   TestResult[]
+}
+
+model TestTemplate {
+  id        Int        @id @default(autoincrement())
+  name      String
+  owner     User       @relation(fields: [ownerId], references: [id])
+  ownerId   Int
+  tasks     TestTask[]
+  tests     Test[]
+}
+
+model TestTask {
+  id          Int           @id @default(autoincrement())
+  name        String
+  description String
+  category    String
+  type        String
+  required    Boolean
+  minPoints   Int
+  maxPoints   Int
+  order       Int
+  template    TestTemplate  @relation(fields: [templateId], references: [id])
+  templateId  Int
+  results     TestResult[]
+}
+
+model Test {
+  id         Int          @id @default(autoincrement())
+  template   TestTemplate @relation(fields: [templateId], references: [id])
+  templateId Int
+  school     School       @relation(fields: [schoolId], references: [id])
+  schoolId   Int
+  class      Class?       @relation(fields: [classId], references: [id])
+  classId    Int?
+  owner      User         @relation(fields: [ownerId], references: [id])
+  ownerId    Int
+  createdAt  DateTime     @default(now())
+  results    TestResult[]
+}
+
+model TestResult {
+  id        Int       @id @default(autoincrement())
+  test      Test      @relation(fields: [testId], references: [id])
+  testId    Int
+  student   Student   @relation(fields: [studentId], references: [id])
+  studentId Int
+  task      TestTask  @relation(fields: [taskId], references: [id])
+  taskId    Int
+  points    Int
+}
