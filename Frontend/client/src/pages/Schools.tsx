@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios  from "axios";
+import { Link } from "react-router-dom";
 // Typ szkoły (dopasuj do swojego modelu!)
 type School = {
   id: number;
@@ -63,7 +64,9 @@ const Schools: React.FC = () => {
       <h2>Twoje szkoły</h2> 
       <ul>
         {schools.map((school) => (
-          <li key={school.id}>{school.name}</li>
+          <li key={school.id}>
+            <Link to={`/schools/${school.id}`}>{school.name}</Link>
+          </li>
         ))}
       </ul>
 
