@@ -69,6 +69,52 @@ const SchoolDetails: React.FC = () => {
     }
   };
 
+  // Edycja klasy
+    const handleEditClass = async (classId: number) => {
+        const newName = prompt("Podaj nową nazwę klasy:");
+        if (!newName) return;
+        setMessage("");
+        const token = localStorage.getItem("token");
+        try {
+        const res = await axios.put<SchoolClass>(
+            `http://localhost:4000/schools/${id}/classes/${classId}`,
+            { name: newName },
+            {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            }
+        );
+        setClasses(classes.map(cls => (cls.id === classId ? res.data : cls)));
+        setMessage("Klasa zaktualizowana!");
+        } catch (err: unknown) {
+        if (axios.isAxiosError(err)) {
+            setMessage(err.response?.data?.error || "Błąd edycji klasy");
+        } else {
+            setMessage("Błąd edycji klasy");
+        }
+        }
+    };
+    // Usuwanie klasy
+    const handleDeleteClass = async (classId: number) => {
+        if (!window.confirm("Na pewno usunąć tę klasę?")) return;
+        setMessage("");
+        const token = localStorage.getItem("token");
+        try {
+        await axios.delete(`http://localhost:4000/schools/${id}/classes/${classId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        setClasses(classes.filter(cls => cls.id !== classId));
+        setMessage("Klasa usunięta!");
+        } catch (err: unknown) {
+        if (axios.isAxiosError(err)) {
+            setMessage(err.response?.data?.error || "Błąd usuwania klasy");
+        } else {
+            setMessage("Błąd usuwania klasy");
+        }
+        }
+    };
+
   return (
     <div>
       <h2>Szczegóły szkoły (ID: {id})</h2>
@@ -76,7 +122,11 @@ const SchoolDetails: React.FC = () => {
       <h3>Lista klas</h3>
       <ul>
         {classes.map(cls => (
-          <li key={cls.id}>{cls.name}</li>
+          <li key={cls.id}>
+            {cls.name}{" "}
+            <button onClick={() => handleEditClass(cls.id)}>Edytuj</button>{" "}
+            <button onClick={() => handleDeleteClass(cls.id)}>Usuń</button>
+          </li>
         ))}
       </ul>
 

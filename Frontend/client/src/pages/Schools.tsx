@@ -59,13 +59,55 @@ const Schools: React.FC = () => {
     }
   };
 
+  // Edytowanie szkoły
+  const handleEditSchool = async (id: number) => {
+  const newName = prompt("Podaj nową nazwę szkoły:");
+  if (!newName) return;
+  const token = localStorage.getItem("token");
+  try {
+    await axios.put(
+      `http://localhost:4000/schools/${id}`,
+      { name: newName },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    setSchools(schools.map(s => (s.id === id ? { ...s, name: newName } : s)));
+  } catch (err: unknown) {
+        if (axios.isAxiosError(err)) {
+            setMessage(err.response?.data?.error || "Błąd edycji szkoły");
+        } else {
+            setMessage("Błąd edycji szkoły");
+        }
+        }
+};
+
+//usuwanie szkoły
+const handleDeleteSchool = async (id: number) => {
+  if (!window.confirm("Na pewno usunąć szkołę?")) return;
+  const token = localStorage.getItem("token");
+  try {
+    await axios.delete(`http://localhost:4000/schools/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setSchools(schools.filter(s => s.id !== id));
+  } catch (err: unknown) {
+        if (axios.isAxiosError(err)) {
+            setMessage(err.response?.data?.error || "Błąd usuwania szkoły");
+        } else {
+            setMessage("Błąd usuwania szkoły");
+        }
+        }
+};
+
+// Renderowanie listy szkół
   return (
     <div>
       <h2>Twoje szkoły</h2> 
       <ul>
         {schools.map((school) => (
           <li key={school.id}>
-            <Link to={`/schools/${school.id}`}>{school.name}</Link>
+            <Link to={`/schools/${school.id}`}>{school.name}</Link>{" "}
+            <button onClick={() => handleEditSchool(school.id)}>Edytuj</button>{" "}
+            <button onClick={() => handleDeleteSchool(school.id)}>Usuń</button>
           </li>
         ))}
       </ul>
