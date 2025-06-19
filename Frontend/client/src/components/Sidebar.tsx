@@ -64,7 +64,6 @@ const linksMain = [
 ];
 
 const linksTest = [
-  // ...twój kod, bez zmian
   {
     name: "Test template",
     to: "",
@@ -173,7 +172,7 @@ const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className="fixed top-0 left-0 h-screen w-[230px] flex flex-col z-30"
+      className=" top-0 left-0 h-screen w-[230px] flex flex-col z-30"
       style={{ background: colors.sidebarBg }}
     >
       {/* Logo/brand */}
