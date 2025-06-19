@@ -4,6 +4,32 @@ import { prisma } from "../prisma";
 
 const router = express.Router();
 
+//Pobierz wszystkie klasy
+router.get(
+  "/classes",
+  authenticateJWT,
+  async (req: Request, res: Response) => {
+    try {
+      // Pobierz klasy z nazwą szkoły (join school)
+      const classes = await prisma.class.findMany({
+        where: {
+          school: { ownerId: req.userId },
+        },
+        include: {
+          school: { select: { id: true, name: true } },
+        },
+        orderBy: [
+          { schoolId: "asc" },
+          { order: "asc" }
+        ],
+      });
+      res.json(classes);
+    } catch (err) {
+      res.status(500).json({ error: "Błąd serwera przy pobieraniu wszystkich klas." });
+    }
+  }
+);
+
 // Dodawanie klasy do wybranej szkoły
 router.post(
   "/schools/:schoolId/classes",
@@ -46,6 +72,7 @@ router.post(
     }
   }
 );
+
 // Pobierz wszystkie klasy z wybranej szkoły
 router.get(
   "/schools/:schoolId/classes",

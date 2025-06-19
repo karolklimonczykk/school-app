@@ -214,7 +214,7 @@ const Schools: React.FC = () => {
                         </div>
                       ) : (
                         <Link
-                          to={`/schools/${school.id}`}
+                          to={`/classes?school=${school.id}`}
                           className="text-gray-800 font-semibold text-base hover:underline break-all"
                         >
                           {school.name}

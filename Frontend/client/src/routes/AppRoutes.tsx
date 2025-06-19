@@ -6,7 +6,7 @@ import Register from "../pages/Register";
 import Schools from "../pages/Schools";
 import SchoolDetails from "../pages/SchoolDetails";
 import ClassDetails from "../pages/ClassDetails";
-
+import Classes from "../pages/Classes";
 const AppRoutes: React.FC = () => {
   const { isLoggedIn } = useAuth();
 
@@ -15,6 +15,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/schools" element={isLoggedIn ? <Schools /> : <Navigate to="/login" replace />} />
       <Route path="/schools/:id" element={isLoggedIn ? <SchoolDetails /> : <Navigate to="/login" replace />} />
       <Route path="/schools/:schoolId/classes/:classId" element={isLoggedIn ? <ClassDetails /> : <Navigate to="/login" replace />} />
+      <Route path="/classes" element={isLoggedIn ? <Classes /> : <Navigate to="/login" replace />} />
       <Route path="/login" element={!isLoggedIn ? <Login/> : <Navigate to="/schools" replace />} />
       <Route path="/register" element={!isLoggedIn ? <Register /> : <Navigate to="/schools" replace />} />
       <Route path="*" element={<Navigate to={isLoggedIn ? "/schools" : "/login"} replace />} />
