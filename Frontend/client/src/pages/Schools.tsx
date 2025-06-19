@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import axios  from "axios";
 import { Link } from "react-router-dom";
+ // import Navbar from "../components/Navbar";
+import Sidebar from "../components/Sidebar";
 // Typ szkoły (dopasuj do swojego modelu!)
 type School = {
   id: number;
@@ -101,6 +103,7 @@ const handleDeleteSchool = async (id: number) => {
 // Renderowanie listy szkół
   return (
     <div>
+      <Sidebar />
       <h2>Twoje szkoły</h2> 
       <ul>
         {schools.map((school) => (
