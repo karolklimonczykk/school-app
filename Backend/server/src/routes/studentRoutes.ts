@@ -4,6 +4,28 @@ import { prisma } from "../prisma";
 
 const router = express.Router();
 
+// Pobierz wszystkich uczniów
+router.get(
+  "/students",
+  authenticateJWT,
+  async (req: Request, res: Response) => {
+    try {
+      const students = await prisma.student.findMany({
+        where: {
+          class: { school: { ownerId: req.userId } },
+        },
+        include: {
+          class: { include: { school: true } },
+        },
+        orderBy: [{ classId: "asc" }, { order: "asc" }],
+      });
+      res.json(students);
+    } catch (err) {
+      res.status(500).json({ error: "Błąd serwera przy pobieraniu uczniów." });
+    }
+  }
+);
+
 // Dodaj ucznia do klasy
 router.post(
   "/schools/:schoolId/classes/:classId/students",

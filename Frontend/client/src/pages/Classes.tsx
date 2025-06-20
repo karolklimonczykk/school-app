@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Sidebar from "../components/Sidebar";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 // Typy
 type School = {
@@ -358,9 +358,13 @@ useEffect(() => {
                             </button>
                           </div>
                         ) : (
-                          <span className="text-gray-800 font-semibold text-base break-all">
-                            {cls.name}
-                          </span>
+                          <Link
+  to={`/students?school=${cls.schoolId}&class=${cls.id}`}
+  className="hover:underline text-gray-800 font-semibold text-base"
+>
+  {cls.name}
+</Link>
+
                         )}
                       </td>
                       <td className="pl-6 text-gray-500 min-w-[180px]">

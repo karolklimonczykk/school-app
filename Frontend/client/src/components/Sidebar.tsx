@@ -150,13 +150,14 @@ const Sidebar: React.FC = () => {
               transition: "all 0.18s cubic-bezier(.5,1.5,.75,1.2)",
             }}
           >
-            {React.cloneElement(link.icon as React.ReactElement, {
-              color: iconColor,
-              style: { color: iconColor },
-              stroke: iconColor,
-              width: 20,
-              height: 20,
-            })}
+            {React.cloneElement(
+              link.icon as React.ReactElement<React.SVGProps<SVGSVGElement>>,
+              {
+                stroke: iconColor,
+                width: 20,
+                height: 20,
+              }
+            )}
           </span>
           <span
             className="text-[15px] font-bold transition"
