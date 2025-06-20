@@ -47,7 +47,6 @@ const Students: React.FC = () => {
 
   // 3. Po wybraniu szkoły pobierz klasy
   useEffect(() => {
-    // Przy zmianie szkoły, jeżeli nie ma w query stringu classId, wyczyść filtr klasy
     const params = new URLSearchParams(location.search);
     const classQuery = params.get("class");
     if (!classQuery) setSelectedClassId("");
@@ -262,12 +261,12 @@ const Students: React.FC = () => {
   return (
     <div className="min-h-screen flex bg-[#f7fafc]">
       <Sidebar />
-      <main className="flex-1 flex flex-col items-center px-4 pt-10 pb-8 sm:px-8">
-        <div className="w-full max-w-100% mx-auto">
+      <main className="flex-1 flex flex-col items-center px-4 pt-10 pb-8 sm:px-8 md:ml-[230px] overflow-hidden">
+        <div className="w-full mx-auto">
           {/* Nagłówek + filtracja */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
             <h2 className="text-2xl font-bold text-[#222B45]">Students Table</h2>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap justify-center">
               <select
                 className="border border-gray-300 rounded-lg px-3 py-2 bg-white font-medium text-sm focus:outline-none focus:border-teal-400"
                 value={selectedSchoolId}
@@ -360,8 +359,8 @@ const Students: React.FC = () => {
             </div>
           )}
           {/* Tabela */}
-          <div className="bg-white rounded-xl shadow-md overflow-x-auto w-full">
-            <table className="min-w-full">
+          <div className="bg-white rounded-xl shadow-md w-full overflow-x-auto">
+            <table className="w-full min-w-[700px]">
               <thead>
                 <tr>
                   <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6">STUDENT NAME</th>
@@ -398,7 +397,7 @@ const Students: React.FC = () => {
                           {getInitials(student.firstName, student.lastName)}
                         </div>
                         {editId === student.id ? (
-                          <div className="flex gap-2 items-center w-full">
+                          <div className="flex gap-2 items-center w-full flex-wrap">
                             <input
                               className="border border-gray-300 rounded-lg px-3 py-1 w-28 focus:outline-none focus:border-teal-400"
                               value={editStudent.firstName}

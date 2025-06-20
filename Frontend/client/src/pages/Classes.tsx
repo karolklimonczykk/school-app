@@ -225,7 +225,7 @@ useEffect(() => {
   return (
     <div className="min-h-screen flex bg-[#f7fafc]">
       <Sidebar />
-      <main className="flex-1 flex flex-col items-center px-4 pt-10 pb-8 sm:px-8">
+      <main className="flex-1 flex flex-col items-center px-4 pt-10 pb-8 sm:px-8 md:ml-[230px]">
         <div className="w-full max-w-10xl mx-auto">
           {/* Nagłówek + filtracja */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
