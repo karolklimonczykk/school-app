@@ -3,7 +3,12 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { sidebarColors } from "./sidebarColors";
 import SidebarLinks from "./SidebarLinks.tsx";
-import { linksMain, linksTest, LogoutIcon, HamburgerIcon } from "./sidebarLinksIcons.tsx";
+import {
+  linksMain,
+  linksTest,
+  LogoutIcon,
+  HamburgerIcon,
+} from "./sidebarLinksIcons.tsx";
 
 const Sidebar: React.FC = () => {
   const navigate = useNavigate();
@@ -36,7 +41,7 @@ const Sidebar: React.FC = () => {
       aria-label="Otwórz menu"
       type="button"
       style={{
-        display: isMobile && !showMobile ? "block" : "none"
+        display: isMobile && !showMobile ? "block" : "none",
       }}
     >
       {HamburgerIcon}
@@ -45,7 +50,11 @@ const Sidebar: React.FC = () => {
 
   const Overlay = (
     <div
-      className={`fixed inset-0 z-30 transition-opacity duration-300 ${showMobile ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+      className={`fixed inset-0 z-30 transition-opacity duration-300 ${
+        showMobile
+          ? "opacity-100 pointer-events-auto"
+          : "opacity-0 pointer-events-none"
+      }`}
       style={{ background: "rgba(0,0,0,0.16)" }}
       onClick={() => setShowMobile(false)}
     />
@@ -57,7 +66,7 @@ const Sidebar: React.FC = () => {
       ? showMobile
         ? "translate-x-0"
         : "-translate-x-full"
-      : "translate-x-0"
+      : "translate-x-0",
   ].join(" ");
 
   return (
@@ -69,26 +78,68 @@ const Sidebar: React.FC = () => {
         style={{
           background: sidebarColors.sidebarBg,
           minHeight: "100vh",
-          boxShadow: isMobile ? "0 2px 20px 2px rgba(90,170,180,.12)" : undefined,
+          boxShadow: isMobile
+            ? "0 2px 20px 2px rgba(90,170,180,.12)"
+            : undefined,
           borderRight: "none",
         }}
       >
         {/* Logo/brand */}
-        <div className="flex items-center justify-center" style={{ width: "85%", margin: "20px auto 10px auto", height: "44px" }}>
-          <span className="text-xl font-bold tracking-wide flex items-center gap-2" style={{ color: sidebarColors.textActive }}>
-            {/* ...SVG Logo... */}
+        <div
+          className="flex items-center justify-center"
+          style={{
+            width: "85%",
+            margin: "20px auto 10px auto",
+            height: "44px",
+          }}
+        >
+          <span
+            className="text-xl font-bold tracking-wide flex items-center gap-2"
+            style={{ color: sidebarColors.textActive }}
+          >
+            {/* SVG Logo*/}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-6 h-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke={sidebarColors.icon}
+              strokeWidth="1.5"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347M2.25 9.334A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM6.75 15v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"
+              />
+            </svg>
+
             <span style={{ fontWeight: 700, fontSize: 19 }}>school-app</span>
           </span>
         </div>
         {/* Separator */}
-        <div className="h-[0.5px] mx-auto my-2 w-[85%] relative overflow-hidden" style={{ background: "none" }}>
-          <div className="absolute inset-0 w-full h-full pointer-events-none" style={{
-            background: `linear-gradient(90deg, #f7fafc 0%, ${sidebarColors.separator} 15%, ${sidebarColors.separator} 85%, #f7fafc 100%)`
-          }} />
+        <div
+          className="h-[0.5px] mx-auto my-2 w-[85%] relative overflow-hidden"
+          style={{ background: "none" }}
+        >
+          <div
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            style={{
+              background: `linear-gradient(90deg, #f7fafc 0%, ${sidebarColors.separator} 15%, ${sidebarColors.separator} 85%, #f7fafc 100%)`,
+            }}
+          />
         </div>
         <nav className="flex-1 flex flex-col">
           <ul className="flex flex-col gap-[14px] mt-2 mb-2">
-            <SidebarLinks links={linksMain} isMain={true} onLinkClick={() => setShowMobile(false)} />
+            <SidebarLinks
+              links={linksMain}
+              isMain={true}
+              onLinkClick={() => setShowMobile(false)}
+            />
           </ul>
           <p
             className="font-bold uppercase mt-6 mb-4"
@@ -103,7 +154,10 @@ const Sidebar: React.FC = () => {
             TEST PAGES
           </p>
           <ul className="flex flex-col gap-[14px] mt-6">
-            <SidebarLinks links={linksTest} onLinkClick={() => setShowMobile(false)} />
+            <SidebarLinks
+              links={linksTest}
+              onLinkClick={() => setShowMobile(false)}
+            />
           </ul>
         </nav>
         <div className="mt-auto w-full flex flex-col items-center pb-8 pt-3">
@@ -112,9 +166,11 @@ const Sidebar: React.FC = () => {
             style={{
               width: "85%",
               padding: "8px 14px",
-              background: hoverLogout ? sidebarColors.iconHoverBg : "transparent",
+              background: hoverLogout
+                ? sidebarColors.iconHoverBg
+                : "transparent",
               color: hoverLogout ? sidebarColors.textHover : sidebarColors.text,
-              cursor: "pointer"
+              cursor: "pointer",
             }}
             onClick={handleLogout}
             onMouseEnter={() => setHoverLogout(true)}
@@ -124,8 +180,12 @@ const Sidebar: React.FC = () => {
             <span
               className="flex items-center justify-center w-8 h-8 rounded-[12px] transition-all"
               style={{
-                background: hoverLogout ? sidebarColors.iconHoverBg : sidebarColors.iconBg,
-                color: hoverLogout ? sidebarColors.iconHover : sidebarColors.icon,
+                background: hoverLogout
+                  ? sidebarColors.iconHoverBg
+                  : sidebarColors.iconBg,
+                color: hoverLogout
+                  ? sidebarColors.iconHover
+                  : sidebarColors.icon,
                 fontSize: "17px",
                 transition: "all 0.18s cubic-bezier(.5,1.5,.75,1.2)",
               }}
@@ -142,8 +202,18 @@ const Sidebar: React.FC = () => {
             aria-label="Zamknij menu"
             type="button"
           >
-            <svg className="w-7 h-7" fill="none" stroke="#a6b3c4" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M6 18L18 6" />
+            <svg
+              className="w-7 h-7"
+              fill="none"
+              stroke="#a6b3c4"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 6l12 12M6 18L18 6"
+              />
             </svg>
           </button>
         )}
