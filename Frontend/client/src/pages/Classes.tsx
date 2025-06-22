@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import Sidebar from "../components/Sidebar";
+import Sidebar from "../components/Sidebar/Sidebar";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 // Typy
@@ -15,7 +15,7 @@ type SchoolClass = {
   name: string;
   order: number;
   schoolId: number;
-  school?: { id: number; name: string }; 
+  school?: { id: number; name: string };
   schoolName?: string;
 };
 
@@ -46,15 +46,14 @@ const Classes: React.FC = () => {
     fetchSchools();
   }, []);
 
-useEffect(() => {
-  // Przy pierwszym wejściu, jeśli jeszcze nie masz szkół, poczekaj!
-  if (schools.length === 0) return;
-  // Jeśli filtr ustawiony na daną szkołę i nie masz szkół, poczekaj!
-  if (selectedSchoolId !== "" && schools.length === 0) return;
-  fetchClasses();
-  // eslint-disable-next-line
-}, [schools, selectedSchoolId]);
-
+  useEffect(() => {
+    // Przy pierwszym wejściu, jeśli jeszcze nie masz szkół, poczekaj!
+    if (schools.length === 0) return;
+    // Jeśli filtr ustawiony na daną szkołę i nie masz szkół, poczekaj!
+    if (selectedSchoolId !== "" && schools.length === 0) return;
+    fetchClasses();
+    // eslint-disable-next-line
+  }, [schools, selectedSchoolId]);
 
   // Pobierz szkoły
   const fetchSchools = async () => {
@@ -92,14 +91,18 @@ useEffect(() => {
         );
       } else {
         // Pobierz klasy dla wszystkich szkół użytkownika
-  const res = await axios.get<SchoolClass[]>(
+        const res = await axios.get<SchoolClass[]>(
           "http://localhost:4000/classes",
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setClasses(
           res.data.map((cls) => ({
             ...cls,
-            schoolName: cls.school?.name || cls.schoolName || schools.find((s) => s.id === cls.schoolId)?.name || "",
+            schoolName:
+              cls.school?.name ||
+              cls.schoolName ||
+              schools.find((s) => s.id === cls.schoolId)?.name ||
+              "",
           }))
         );
       }
@@ -225,7 +228,7 @@ useEffect(() => {
   return (
     <div className="min-h-screen flex bg-[#f7fafc]">
       <Sidebar />
-      <main className="flex-1 flex flex-col items-center px-4 pt-10 pb-8 sm:px-8 md:ml-[230px]">
+      <main className="flex-1 flex flex-col items-center px-4 pt-10 pb-8 sm:px-8 md:ml-[230px] overflow-hidden">
         <div className="w-full max-w-10xl mx-auto">
           {/* Nagłówek + filtracja */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
@@ -359,12 +362,11 @@ useEffect(() => {
                           </div>
                         ) : (
                           <Link
-  to={`/students?school=${cls.schoolId}&class=${cls.id}`}
-  className="hover:underline text-gray-800 font-semibold text-base"
->
-  {cls.name}
-</Link>
-
+                            to={`/students?school=${cls.schoolId}&class=${cls.id}`}
+                            className="hover:underline text-gray-800 font-semibold text-base"
+                          >
+                            {cls.name}
+                          </Link>
                         )}
                       </td>
                       <td className="pl-6 text-gray-500 min-w-[180px]">
