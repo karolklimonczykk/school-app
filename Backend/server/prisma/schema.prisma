@@ -63,15 +63,11 @@ model TestTemplate {
 
 model TestTask {
   id          Int           @id @default(autoincrement())
-  name        String
   description String
-  category    String
-  type        String
-  required    Boolean
   minPoints   Int
   maxPoints   Int
   order       Int
-  template    TestTemplate  @relation(fields: [templateId], references: [id])
+  template    TestTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
   templateId  Int
   results     TestResult[]
 }
@@ -98,5 +94,5 @@ model TestResult {
   studentId Int
   task      TestTask  @relation(fields: [taskId], references: [id])
   taskId    Int
-  points    Int
+  points    Float
 }

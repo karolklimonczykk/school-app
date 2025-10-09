@@ -50,10 +50,7 @@ CREATE TABLE "TestTemplate" (
 -- CreateTable
 CREATE TABLE "TestTask" (
     "id" SERIAL NOT NULL,
-    "name" TEXT NOT NULL,
     "description" TEXT NOT NULL,
-    "category" TEXT NOT NULL,
-    "type" TEXT NOT NULL,
     "required" BOOLEAN NOT NULL,
     "minPoints" INTEGER NOT NULL,
     "maxPoints" INTEGER NOT NULL,
@@ -81,7 +78,7 @@ CREATE TABLE "TestResult" (
     "testId" INTEGER NOT NULL,
     "studentId" INTEGER NOT NULL,
     "taskId" INTEGER NOT NULL,
-    "points" INTEGER NOT NULL,
+    "points" DOUBLE PRECISION NOT NULL,
 
     CONSTRAINT "TestResult_pkey" PRIMARY KEY ("id")
 );
@@ -93,10 +90,10 @@ CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 ALTER TABLE "School" ADD CONSTRAINT "School_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Class" ADD CONSTRAINT "Class_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Class" ADD CONSTRAINT "Class_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Student" ADD CONSTRAINT "Student_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Student" ADD CONSTRAINT "Student_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "TestTemplate" ADD CONSTRAINT "TestTemplate_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

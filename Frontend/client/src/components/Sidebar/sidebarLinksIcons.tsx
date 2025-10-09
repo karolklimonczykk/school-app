@@ -49,8 +49,8 @@ export const linksMain = [
 
 export const linksTest = [
   {
-    name: "Test template",
-    to: "",
+    name: "Test templates",
+    to: "/templates",
     icon: (
       <svg className={ICON_CLASSES} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
         <rect x="4" y="4" width="16" height="16" rx="2" />
@@ -60,7 +60,7 @@ export const linksTest = [
   },
   {
     name: "Tests",
-    to: "",
+    to: "/tests",
     icon: (
       <svg className={ICON_CLASSES} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
         <path d="M5 13l4 4L19 7" />
@@ -69,7 +69,7 @@ export const linksTest = [
   },
   {
     name: "Results",
-    to: "",
+    to: "/results",
     icon: (
       <svg className={ICON_CLASSES} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="10" />

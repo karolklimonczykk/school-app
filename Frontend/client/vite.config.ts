@@ -7,4 +7,9 @@ export default defineConfig({
   plugins: [react(),
     tailwindcss(),
   ],
-})
+   server: {
+    proxy: {
+      "/test-templates": "http://localhost:4000",
+    }
+  }
+});
