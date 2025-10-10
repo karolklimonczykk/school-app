@@ -113,15 +113,6 @@ const Schools: React.FC = () => {
     }
   };
 
-  // Inicjały szkoły
-  const getInitials = (name: string) =>
-    name
-      .split(" ")
-      .map(w => w[0])
-      .join("")
-      .substring(0, 2)
-      .toUpperCase();
-
   return (
     <div className="min-h-screen flex bg-[#f7fafc]">
       <Sidebar />
@@ -181,14 +172,11 @@ const Schools: React.FC = () => {
                         : ""
                     } transition`}
                     style={{
-                      borderColor: "#ececec", // delikatna linia
+                      borderColor: "#ececec",
                       borderWidth: idx !== schools.length - 1 ? "0.2px" : 0,
                     }}
                   >
                     <td className="flex items-center gap-4 py-5 pl-6 min-w-[250px]">
-                      <div className="w-12 h-12 bg-[#f7fafc] flex items-center justify-center rounded-xl text-teal-400 text-xl font-bold shadow-sm">
-                        {getInitials(school.name)}
-                      </div>
                       {editId === school.id ? (
                         <div className="flex gap-2 items-center w-full">
                           <input

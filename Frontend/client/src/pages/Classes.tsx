@@ -25,6 +25,7 @@ const Classes: React.FC = () => {
   const [selectedSchoolId, setSelectedSchoolId] = useState<number | "">("");
   const [newClassName, setNewClassName] = useState("");
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"" | "error" | "success">("");
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -38,7 +39,6 @@ const Classes: React.FC = () => {
     const searchParams = new URLSearchParams(location.search);
     const schoolQuery = searchParams.get("school");
     if (schoolQuery) setSelectedSchoolId(Number(schoolQuery));
-    // eslint-disable-next-line
   }, [location.search]);
 
   // Pobierz szkoły użytkownika (do selecta) + klasy
@@ -64,6 +64,7 @@ const Classes: React.FC = () => {
       });
       setSchools(res.data);
     } catch {
+      setMessageType("error");
       setMessage("Błąd pobierania szkół!");
     }
   };
@@ -108,8 +109,10 @@ const Classes: React.FC = () => {
       }
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
+        setMessageType("error");
         setMessage(err.response?.data?.error || "Błąd pobierania klasy");
       } else {
+        setMessageType("error");
         setMessage("Błąd pobierania klasy");
       }
     } finally {
@@ -144,8 +147,10 @@ const Classes: React.FC = () => {
       setMessage("Klasa dodana!");
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
+        setMessageType("error");
         setMessage(err.response?.data?.error || "Błąd dodawania klasy");
       } else {
+        setMessageType("error");
         setMessage("Błąd dodawania klasy");
       }
     }
@@ -156,29 +161,30 @@ const Classes: React.FC = () => {
     setEditId(cls.id);
     setEditName(cls.name);
   };
-  const handleSaveEdit = async (classId: number) => {
-    if (!selectedSchoolId) return;
+  const handleSaveEdit = async (classId: number, schoolId: number) => {
     const token = localStorage.getItem("token");
     try {
-      const res = await axios.put<SchoolClass>(
-        `http://localhost:4000/schools/${selectedSchoolId}/classes/${classId}`,
+      const res = await axios.put(
+        `http://localhost:4000/schools/${schoolId}/classes/${classId}`,
         { name: editName },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setClasses(
         classes.map((cls) =>
-          cls.id === classId ? { ...res.data, schoolName: cls.schoolName } : cls
+          cls.id === classId
+            ? { ...res.data, schoolName: cls.schoolName || cls.school?.name }
+            : cls
         )
       );
       setEditId(null);
       setEditName("");
       setMessage("Klasa zaktualizowana!");
     } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        setMessage(err.response?.data?.error || "Błąd edycji klasy");
-      } else {
-        setMessage("Błąd edycji klasy");
-      }
+      setMessage(
+        axios.isAxiosError(err)
+          ? err.response?.data?.error || "Błąd edycji klasy"
+          : "Błąd edycji klasy"
+      );
     }
   };
   const handleCancelEdit = () => {
@@ -187,14 +193,13 @@ const Classes: React.FC = () => {
   };
 
   // Usuń klasę
-  const handleDeleteClass = async (classId: number) => {
-    if (!selectedSchoolId) return;
+  const handleDeleteClass = async (classId: number, schoolId: number) => {
     if (!window.confirm("Na pewno usunąć tę klasę?")) return;
     setMessage("");
     const token = localStorage.getItem("token");
     try {
       await axios.delete(
-        `http://localhost:4000/schools/${selectedSchoolId}/classes/${classId}`,
+        `http://localhost:4000/schools/${schoolId}/classes/${classId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -204,13 +209,6 @@ const Classes: React.FC = () => {
     } catch {
       setMessage("Błąd usuwania klasy");
     }
-  };
-
-  // Skrót klasy
-  const getInitials = (name: string) => {
-    const words = name.trim().split(" ");
-    const lastWord = words[words.length - 1] || "";
-    return lastWord.slice(-2).toUpperCase();
   };
 
   // Po zmianie filtra od razu zmień url
@@ -234,20 +232,50 @@ const Classes: React.FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
             <h2 className="text-2xl font-bold text-[#222B45]">Classes Table</h2>
             <div className="flex gap-2">
-              <select
-                className="border border-gray-300 rounded-lg px-3 py-2 bg-white font-medium text-sm focus:outline-none focus:border-teal-400"
-                value={selectedSchoolId}
-                onChange={handleFilterSchool}
-              >
-                <option value="">Wszystkie szkoły</option>
-                {schools.map((school) => (
-                  <option value={school.id} key={school.id}>
-                    {school.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative inline-block">
+                <select
+                  className="border border-gray-300 rounded-lg px-3 pr-10 py-2 bg-white font-medium text-sm
+             focus:outline-none focus:border-teal-400 block w-64 md:w-80 truncate appearance-none"
+                  value={selectedSchoolId}
+                  onChange={handleFilterSchool}
+                  title={
+                    selectedSchoolId
+                      ? schools.find((s) => s.id === selectedSchoolId)?.name ??
+                        ""
+                      : "Wszystkie szkoły"
+                  }
+                >
+                  <option value="">Wszystkie szkoły</option>
+                  {schools.map((school) => (
+                    <option key={school.id} value={school.id}>
+                      {school.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-500">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </span>
+              </div>
               <button
-                onClick={() => setShowAddInput(true)}
+                onClick={() => {
+                  if (!selectedSchoolId) {
+                    setMessageType("error");
+                    setMessage("Wybierz szkołę, do której chcesz dodać klasę!");
+                    return;
+                  }
+                  setMessageType(""); // czyść poprzedni typ
+                  setMessage("");
+                  setShowAddInput(true);
+                }}
                 className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
               >
                 + Add Class
@@ -255,7 +283,7 @@ const Classes: React.FC = () => {
             </div>
           </div>
           {/* Dodawanie klasy */}
-          {showAddInput && (
+          {showAddInput && selectedSchoolId && (
             <form
               onSubmit={handleAddClass}
               className="mb-7 flex gap-2 items-end"
@@ -292,7 +320,13 @@ const Classes: React.FC = () => {
 
           {/* Wiadomości */}
           {message && (
-            <div className="mb-4 text-center font-medium text-sm text-teal-600 bg-teal-50 rounded-lg py-2 px-4">
+            <div
+              className={`mb-4 text-center font-medium text-sm rounded-lg py-2 px-4 ${
+                messageType === "error"
+                  ? "text-red-600 bg-red-50"
+                  : "text-teal-600 bg-teal-50"
+              }`}
+            >
               {message}
             </div>
           )}
@@ -334,9 +368,6 @@ const Classes: React.FC = () => {
                       }}
                     >
                       <td className="flex items-center gap-4 py-5 pl-6 min-w-[210px]">
-                        <div className="w-12 h-12 bg-[#f7fafc] flex items-center justify-center rounded-xl text-teal-400 text-xl font-bold shadow-sm">
-                          {getInitials(cls.name)}
-                        </div>
                         {editId === cls.id ? (
                           <div className="flex gap-2 items-center w-full">
                             <input
@@ -347,7 +378,7 @@ const Classes: React.FC = () => {
                             />
                             <button
                               className="text-teal-500 font-semibold px-2 py-1 hover:bg-teal-50 rounded transition"
-                              onClick={() => handleSaveEdit(cls.id)}
+                              onClick={() => handleSaveEdit(cls.id, cls.schoolId)}
                               type="button"
                             >
                               Save
@@ -385,7 +416,7 @@ const Classes: React.FC = () => {
                             </button>
                             <button
                               className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
-                              onClick={() => handleDeleteClass(cls.id)}
+                              onClick={() => handleDeleteClass(cls.id, cls.schoolId)}
                             >
                               Delete
                             </button>
