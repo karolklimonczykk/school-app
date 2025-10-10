@@ -345,8 +345,8 @@ const Students: React.FC = () => {
               {/* SELECT SZKOŁY */}
               <div className="relative inline-block">
                 <select
-                  className="appearance-none border border-gray-300 rounded-lg px-3 pr-10 py-2 bg-white font-medium text-sm
-                             focus:outline-none focus:border-teal-400 truncate"
+                  className="border border-gray-300 rounded-lg px-3 pr-10 py-2 bg-white font-medium text-sm
+                  focus:outline-none focus:border-teal-400 block w-64 md:w-80 truncate appearance-none"
                   value={selectedSchoolId}
                   onChange={handleFilterSchool}
                   title={currentSchoolName}

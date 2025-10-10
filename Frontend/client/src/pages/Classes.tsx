@@ -235,7 +235,7 @@ const Classes: React.FC = () => {
               <div className="relative inline-block">
                 <select
                   className="border border-gray-300 rounded-lg px-3 pr-10 py-2 bg-white font-medium text-sm
-             focus:outline-none focus:border-teal-400 block w-64 md:w-80 truncate appearance-none"
+                  focus:outline-none focus:border-teal-400 block w-64 md:w-80 truncate appearance-none"
                   value={selectedSchoolId}
                   onChange={handleFilterSchool}
                   title={
@@ -378,7 +378,9 @@ const Classes: React.FC = () => {
                             />
                             <button
                               className="text-teal-500 font-semibold px-2 py-1 hover:bg-teal-50 rounded transition"
-                              onClick={() => handleSaveEdit(cls.id, cls.schoolId)}
+                              onClick={() =>
+                                handleSaveEdit(cls.id, cls.schoolId)
+                              }
                               type="button"
                             >
                               Save
@@ -416,7 +418,9 @@ const Classes: React.FC = () => {
                             </button>
                             <button
                               className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
-                              onClick={() => handleDeleteClass(cls.id, cls.schoolId)}
+                              onClick={() =>
+                                handleDeleteClass(cls.id, cls.schoolId)
+                              }
                             >
                               Delete
                             </button>
