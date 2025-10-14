@@ -1,7 +1,5 @@
 // components/Sidebar/sidebarLinks.tsx
 import React from "react";
-
-// Ikony do przycisków (przenieś te svg do osobnych zmiennych)
 export const ICON_CLASSES = "w-5 h-5 transition-colors duration-150";
 
 export const linksMain = [

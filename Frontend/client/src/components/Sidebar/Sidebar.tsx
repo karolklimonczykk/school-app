@@ -1,6 +1,5 @@
 // components/Sidebar/Sidebar.tsx
 import React from "react";
-import { useNavigate } from "react-router-dom";
 import { sidebarColors } from "./sidebarColors";
 import SidebarLinks from "./SidebarLinks.tsx";
 import {
@@ -11,7 +10,6 @@ import {
 } from "./sidebarLinksIcons.tsx";
 
 const Sidebar: React.FC = () => {
-  const navigate = useNavigate();
   const [showMobile, setShowMobile] = React.useState(false);
   const [hoverLogout, setHoverLogout] = React.useState(false);
   const [isMobile, setIsMobile] = React.useState(
