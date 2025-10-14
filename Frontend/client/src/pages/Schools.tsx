@@ -122,7 +122,7 @@ const Schools: React.FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
             <h2 className="text-2xl font-bold text-[#222B45]">Schools Table</h2>
             <button
-              onClick={() => setShowForm(f => !f)}
+              onClick={() => setShowForm(true)}
               className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
             >
               + Add School
@@ -144,6 +144,15 @@ const Schools: React.FC = () => {
                 className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
               >
                 Dodaj
+              </button>
+              <button
+                type="button"
+                className="ml-2 text-gray-400 font-semibold hover:bg-gray-100 rounded px-4 py-2 transition"
+                onClick={() => {
+                  setShowForm(false);
+                }}
+              >
+                Anuluj
               </button>
             </form>
           )}
