@@ -610,10 +610,19 @@ const Modal: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({
     <div className="bg-white rounded-xl shadow-lg p-7 min-w-[640px] w-[70%] relative">
       <button
         onClick={onClose}
-        className="absolute top-2 right-4 text-gray-400 hover:text-teal-400 text-2xl font-bold transition"
+        className="absolute top-4 right-4 w-9 h-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition"
         aria-label="Zamknij"
       >
-        &times;
+         <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
       </button>
       {children}
     </div>

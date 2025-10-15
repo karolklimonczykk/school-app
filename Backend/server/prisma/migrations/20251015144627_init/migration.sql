@@ -51,7 +51,6 @@ CREATE TABLE "TestTemplate" (
 CREATE TABLE "TestTask" (
     "id" SERIAL NOT NULL,
     "description" TEXT NOT NULL,
-    "required" BOOLEAN NOT NULL,
     "minPoints" INTEGER NOT NULL,
     "maxPoints" INTEGER NOT NULL,
     "order" INTEGER NOT NULL,
@@ -63,11 +62,12 @@ CREATE TABLE "TestTask" (
 -- CreateTable
 CREATE TABLE "Test" (
     "id" SERIAL NOT NULL,
-    "templateId" INTEGER NOT NULL,
-    "schoolId" INTEGER NOT NULL,
-    "classId" INTEGER,
+    "name" TEXT NOT NULL,
+    "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "ownerId" INTEGER NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "templateId" INTEGER NOT NULL,
+    "schoolId" INTEGER,
+    "classId" INTEGER,
 
     CONSTRAINT "Test_pkey" PRIMARY KEY ("id")
 );
@@ -86,6 +86,12 @@ CREATE TABLE "TestResult" (
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
+-- CreateIndex
+CREATE INDEX "Test_ownerId_templateId_schoolId_classId_name_idx" ON "Test"("ownerId", "templateId", "schoolId", "classId", "name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TestResult_testId_studentId_taskId_key" ON "TestResult"("testId", "studentId", "taskId");
+
 -- AddForeignKey
 ALTER TABLE "School" ADD CONSTRAINT "School_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -99,19 +105,19 @@ ALTER TABLE "Student" ADD CONSTRAINT "Student_classId_fkey" FOREIGN KEY ("classI
 ALTER TABLE "TestTemplate" ADD CONSTRAINT "TestTemplate_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TestTask" ADD CONSTRAINT "TestTask_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "TestTemplate"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TestTask" ADD CONSTRAINT "TestTask_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "TestTemplate"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Test" ADD CONSTRAINT "Test_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Test" ADD CONSTRAINT "Test_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "TestTemplate"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Test" ADD CONSTRAINT "Test_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Test" ADD CONSTRAINT "Test_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Test" ADD CONSTRAINT "Test_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Test" ADD CONSTRAINT "Test_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "TestResult" ADD CONSTRAINT "TestResult_testId_fkey" FOREIGN KEY ("testId") REFERENCES "Test"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

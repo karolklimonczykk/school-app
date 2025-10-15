@@ -28,7 +28,8 @@ model School {
   owner   User    @relation(fields: [ownerId], references: [id])
   ownerId Int
   classes Class[]
-  tests   Test[]
+  // relacja jawnie nazwana – łatwiej uniknąć konfliktów w przyszłości
+  tests   Test[]  @relation("SchoolTests")
 }
 
 model Class {
@@ -38,15 +39,15 @@ model Class {
   schoolId Int
   students Student[]
   order    Int
-  tests    Test[]
+  tests    Test[]   @relation("ClassTests")
 }
 
 model Student {
-  id       Int     @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   firstName String
   lastName  String
   gender    String
-  class     Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  class     Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
   classId   Int
   order     Int
   results   TestResult[]
@@ -73,26 +74,41 @@ model TestTask {
 }
 
 model Test {
-  id         Int          @id @default(autoincrement())
-  template   TestTemplate @relation(fields: [templateId], references: [id])
-  templateId Int
-  school     School       @relation(fields: [schoolId], references: [id])
-  schoolId   Int
-  class      Class?       @relation(fields: [classId], references: [id])
-  classId    Int?
-  owner      User         @relation(fields: [ownerId], references: [id])
-  ownerId    Int
-  createdAt  DateTime     @default(now())
-  results    TestResult[]
+  id          Int           @id @default(autoincrement())
+  name        String
+  date        DateTime      @default(now())
+  owner       User          @relation(fields: [ownerId], references: [id])
+  ownerId     Int
+
+  template    TestTemplate  @relation(fields: [templateId], references: [id])
+  templateId  Int
+
+  // NOWE: scope (opcjonalne) – możesz przypiąć test do szkoły i/lub klasy
+  school      School?       @relation("SchoolTests", fields: [schoolId], references: [id], onDelete: SetNull)
+  schoolId    Int?
+
+  class       Class?        @relation("ClassTests",  fields: [classId],  references: [id], onDelete: SetNull)
+  classId     Int?
+
+  results     TestResult[]
+
+  // przyspiesza „resume or create”
+  @@unique([ownerId, templateId, name])
 }
 
 model TestResult {
   id        Int       @id @default(autoincrement())
-  test      Test      @relation(fields: [testId], references: [id])
+
+  test      Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
   testId    Int
-  student   Student   @relation(fields: [studentId], references: [id])
+
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
   studentId Int
-  task      TestTask  @relation(fields: [taskId], references: [id])
+
+  task      TestTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
   taskId    Int
+
   points    Float
+
+  @@unique([testId, studentId, taskId])
 }
