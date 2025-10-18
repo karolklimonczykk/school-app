@@ -29,7 +29,10 @@ const TestTemplates: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   // Komunikaty
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<{
+    type: "info" | "error" | "success";
+    text: string;
+  } | null>(null);
 
   // --- Dodawanie (blok na stronie) ---
   const [showAddForm, setShowAddForm] = useState(false);
@@ -55,7 +58,6 @@ const TestTemplates: React.FC = () => {
 
   const fetchTemplates = async () => {
     setLoading(true);
-    setMessage("");
     const token = localStorage.getItem("token");
     try {
       const res = await axios.get("/test-templates", {
@@ -64,7 +66,7 @@ const TestTemplates: React.FC = () => {
       setTemplates(Array.isArray(res.data) ? res.data : []);
     } catch {
       setTemplates([]);
-      setMessage("Błąd pobierania szablonów.");
+      setMessage({ type: "error", text: "Błąd pobierania szablonów." });
     } finally {
       setLoading(false);
     }
@@ -84,12 +86,34 @@ const TestTemplates: React.FC = () => {
     setEditTasks([{ description: "", minPoints: 0, maxPoints: 1 }]);
   };
 
+  // ---- VALIATION: duplicate names for add/edit (case-insensitive, trimmed) ----
+  const duplicateAddName = React.useMemo(() => {
+    const base = addName.trim().toLowerCase();
+    if (!base) return false;
+    return templates.some((t) => (t.name || "").trim().toLowerCase() === base);
+  }, [addName, templates]);
+
+  const isDuplicateRename = (id: number | null, name: string) => {
+    const base = name.trim().toLowerCase();
+    if (!base || id === null) return false;
+    return templates.some(
+      (t) =>
+        t.id !== id && (t.name || "").trim().toLowerCase() === base
+    );
+  };
+
   // ---------------------------------
   // Dodawanie szablonu (blok na stronie)
   // ---------------------------------
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage("");
+    if (duplicateAddName) {
+      setMessage({
+        type: "error",
+        text: "Szablon o takiej nazwie już istnieje.",
+      });
+      return;
+    }
     const token = localStorage.getItem("token");
     try {
       // 1) Tworzymy szablon
@@ -125,9 +149,10 @@ const TestTemplates: React.FC = () => {
       // 4) Sprzątamy
       resetAddForm();
       setShowAddForm(false);
-      setMessage("Szablon testu został zapisany!");
+      setMessage({ type: "success", text: "Szablon testu został zapisany!" });
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err: any) {
-      setMessage(err?.response?.data?.error || "Błąd zapisu szablonu!");
+      setMessage({ type: "error", text: "Błąd zapisu szablonu!" });
     }
   };
 
@@ -155,7 +180,15 @@ const TestTemplates: React.FC = () => {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingId) return;
-    setMessage("");
+
+    if (isDuplicateRename(editingId, editName)) {
+      setMessage({
+        type: "error",
+        text: "Szablon o takiej nazwie już istnieje.",
+      });
+      return;
+    }
+
     const token = localStorage.getItem("token");
     try {
       // 1) Zapis nazwy
@@ -220,9 +253,12 @@ const TestTemplates: React.FC = () => {
       // 4) Zamknij modal
       setEditOpen(false);
       resetEditForm();
-      setMessage("Zapisano zmiany w szablonie.");
+      setMessage({ type: "success", text: "Zapisano zmiany w szablonie." });
     } catch (err: any) {
-      setMessage(err?.response?.data?.error || "Błąd zapisu zmian szablonu!");
+      setMessage({
+        type: "error",
+        text: err?.response?.data?.error || "Błąd zapisu zmian szablonu!",
+      });
     }
   };
 
@@ -231,16 +267,16 @@ const TestTemplates: React.FC = () => {
   // ---------------------------------
   const handleDeleteTemplate = async (id: number) => {
     if (!window.confirm("Na pewno usunąć szablon?")) return;
-    setMessage("");
+    setMessage(null);
     const token = localStorage.getItem("token");
     try {
       await axios.delete(`/test-templates/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setTemplates((prev) => prev.filter((t) => t.id !== id));
-      setMessage("Szablon został usunięty.");
+      setMessage({ type: "success", text: "Szablon został usunięty." });
     } catch {
-      setMessage("Błąd usuwania szablonu.");
+      setMessage({ type: "error", text: "Błąd usuwania szablonu." });
     }
   };
 
@@ -285,7 +321,7 @@ const TestTemplates: React.FC = () => {
               className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
               onClick={() => {
                 setShowAddForm(true);
-                setMessage("");
+                setMessage(null);
                 resetAddForm();
               }}
             >
@@ -295,11 +331,18 @@ const TestTemplates: React.FC = () => {
 
           {/* Komunikaty (nad blokiem tworzenia nowego szablonu) */}
           {message && (
-            <div className="mb-4 text-center font-medium text-sm text-teal-600 bg-teal-50 rounded-lg py-2 px-4">
-              {message}
+            <div
+              className={`mb-4 text-center font-medium text-sm rounded-lg py-2 px-4 ${
+                message.type === "error"
+                  ? "text-red-600 bg-red-50"
+                  : message.type === "success"
+                  ? "text-teal-600 bg-teal-50"
+                  : "text-gray-600 bg-gray-100"
+              }`}
+            >
+              {message.text}
             </div>
           )}
-
           {/* Formularz DODAWANIA (blok pojawia się po kliknięciu) */}
           {showAddForm && (
             <div className="bg-white rounded-xl shadow-md p-6 mb-8">
@@ -310,13 +353,22 @@ const TestTemplates: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  className="border border-gray-300 rounded-lg px-4 py-2 w-full mb-5 focus:outline-none focus:border-teal-400"
+                  className={`border rounded-lg px-4 py-2 w-full focus:outline-none ${
+                    duplicateAddName
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-gray-300 focus:border-teal-400"
+                  }`}
                   value={addName}
                   onChange={(e) => setAddName(e.target.value)}
                   required
                 />
+                {duplicateAddName && (
+                  <div className="text-xs text-red-600 mt-1">
+                    Szablon o takiej nazwie już istnieje.
+                  </div>
+                )}
 
-                <label className="font-semibold block mb-2">Zadania</label>
+                <label className="font-semibold block mb-2 mt-5">Zadania</label>
                 <div>
                   {addTasks.map((task, idx) => (
                     <div
@@ -401,6 +453,7 @@ const TestTemplates: React.FC = () => {
                   <button
                     type="submit"
                     className="bg-[#222B45] hover:bg-teal-600 text-white font-semibold px-7 py-3 rounded-lg transition"
+                    disabled={duplicateAddName}
                   >
                     Zapisz szablon testu
                   </button>
@@ -486,13 +539,22 @@ const TestTemplates: React.FC = () => {
             <label className="block mb-2 font-semibold">Nazwa szablonu</label>
             <input
               type="text"
-              className="border border-gray-300 rounded-lg px-4 py-2 w-full mb-5 focus:outline-none focus:border-teal-400"
+              className={`border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none ${
+                isDuplicateRename(editingId, editName)
+                  ? "border-red-400 focus:border-red-500"
+                  : "border-gray-300 focus:border-teal-400"
+              }`}
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               required
             />
+            {isDuplicateRename(editingId, editName) && (
+              <div className="text-xs text-red-600 mt-1">
+                Szablon o takiej nazwie już istnieje.
+              </div>
+            )}
 
-            <label className="font-semibold block mb-2">Zadania</label>
+            <label className="font-semibold block mb-2 mt-5">Zadania</label>
             <div className="overflow-y-auto max-h-[40vh] block">
               {editTasks.map((task, idx) => (
                 <div
@@ -575,6 +637,7 @@ const TestTemplates: React.FC = () => {
               <button
                 type="submit"
                 className="bg-[#222B45] hover:bg-teal-600 text-white font-semibold px-7 py-3 rounded-lg transition"
+                disabled={isDuplicateRename(editingId, editName)}
               >
                 Zapisz zmiany
               </button>
@@ -613,16 +676,16 @@ const Modal: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({
         className="absolute top-4 right-4 w-9 h-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition"
         aria-label="Zamknij"
       >
-         <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
       </button>
       {children}
     </div>

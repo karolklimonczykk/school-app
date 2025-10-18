@@ -159,9 +159,12 @@ const Tests: React.FC = () => {
   // LISTA SESJI (do wczytywania) – bez filtrów, bez wyboru szablonu
   const fetchSessions = async () => {
     try {
-      const res = await axios.get<TestSession[]>("http://localhost:4000/tests", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await axios.get<TestSession[]>(
+        "http://localhost:4000/tests",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       setSessions(res.data || []);
       setEditId(null);
       setEditName("");
@@ -181,12 +184,18 @@ const Tests: React.FC = () => {
       if (showSessionModal || !testId) return; // ⬅️ blokada wczytywania „za modalem”
       try {
         if (selectedSchoolId && !selectedClassId) {
-          const all = await axios.get<Student[]>("http://localhost:4000/students", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const all = await axios.get<Student[]>(
+            "http://localhost:4000/students",
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
           setStudents(
             all.data.filter(
-              (s) => s.class && s.class.school && s.class.school.id === selectedSchoolId
+              (s) =>
+                s.class &&
+                s.class.school &&
+                s.class.school.id === selectedSchoolId
             )
           );
         } else if (selectedSchoolId && selectedClassId) {
@@ -196,9 +205,12 @@ const Tests: React.FC = () => {
           );
           setStudents(res.data);
         } else {
-          const res = await axios.get<Student[]>("http://localhost:4000/students", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const res = await axios.get<Student[]>(
+            "http://localhost:4000/students",
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
           setStudents(res.data);
         }
       } catch {
@@ -208,7 +220,13 @@ const Tests: React.FC = () => {
     };
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showSessionModal, testId, selectedSchoolId, selectedClassId, schools.length]);
+  }, [
+    showSessionModal,
+    testId,
+    selectedSchoolId,
+    selectedClassId,
+    schools.length,
+  ]);
 
   // PROGRESS – również po wyborze sesji i zamknięciu modala
   useEffect(() => {
@@ -229,13 +247,19 @@ const Tests: React.FC = () => {
     };
     fetchProgress();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showSessionModal, testId, selectedSchoolId, selectedClassId, students.length]);
+  }, [
+    showSessionModal,
+    testId,
+    selectedSchoolId,
+    selectedClassId,
+    students.length,
+  ]);
 
   // LICZBA ZADAŃ dla aktywnej sesji (po wyborze sesji)
   const fetchTasksCount = async (tplId: number) => {
     try {
       const res = await axios.get<any[]>(
-        `http://localhost:4000/test-templates/${tplId}/tasks`,
+        `http://localhost:4000/tests/test-templates/${tplId}/tasks`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setTotalTasks(Array.isArray(res.data) ? res.data.length : 0);
@@ -407,7 +431,7 @@ const Tests: React.FC = () => {
       setTaskErrors((prev) => ({ ...prev, [task.id]: null }));
       return;
     } else if (Number.isNaN(val)) {
-      err = "Dozwolone tylko liczby całe lub połówki (np. 2, 2.5, 3,5).";
+      err = "Niepoprawny format.";
     } else if (val < task.minPoints || val > task.maxPoints) {
       err = `Zakres ${task.minPoints}–${task.maxPoints}.`;
     }
@@ -494,7 +518,7 @@ const Tests: React.FC = () => {
         <div className="w-full mx-auto">
           {/* Pasek nagłówka */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
-            <h2 className="text-2xl font-bold text-[#222B45]">Tests</h2>
+            <h2 className="text-2xl font-bold text-[#222B45]">Twoje sesje testów</h2>
             <button
               onClick={() => setShowSessionModal(true)}
               className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
@@ -512,7 +536,7 @@ const Tests: React.FC = () => {
           <div className="flex gap-3 flex-wrap items-center mb-5">
             <div className="relative inline-block">
               <select
-                className="border border-gray-300 rounded-lg px-3 pr-10 py-2 bg-white font-medium text-sm focus:outline-none focus:border-teal-400 w-64 truncate appearance-none"
+                className="border border-gray-300 rounded-lg px-3 pr-10 py-2 bg-white font-medium text-sm focus:outline-none focus:border-teal-400 block w-64 md:w-80 truncate appearance-none"
                 value={selectedSchoolId}
                 onChange={(e) => {
                   const value = e.target.value;
@@ -552,8 +576,11 @@ const Tests: React.FC = () => {
                   const value = e.target.value;
                   setSelectedClassId(value ? Number(value) : "");
                   if (value && selectedSchoolId)
-                    navigate(`/tests?school=${selectedSchoolId}&class=${value}`);
-                  else if (selectedSchoolId) navigate(`/tests?school=${selectedSchoolId}`);
+                    navigate(
+                      `/tests?school=${selectedSchoolId}&class=${value}`
+                    );
+                  else if (selectedSchoolId)
+                    navigate(`/tests?school=${selectedSchoolId}`);
                   else navigate("/tests");
                 }}
                 title={currentClassName}
@@ -598,7 +625,7 @@ const Tests: React.FC = () => {
           {/* 2-kolumnowy layout: uczniowie + panel ocen */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* LEWA: uczniowie */}
-            <div className="bg-white rounded-xl shadow-md p-4 max-h-[70vh] overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-md p-4">
               <h3 className="font-bold mb-3">Uczniowie</h3>
               {!testId || showSessionModal ? (
                 <div className="text-gray-400 text-sm">
@@ -609,7 +636,7 @@ const Tests: React.FC = () => {
                   Brak uczniów do wyświetlenia.
                 </div>
               ) : (
-                <ul className="flex flex-col gap-2">
+                <ul className="flex flex-col gap-2 overflow-y-auto max-h-[63vh]">
                   {students.map((s) => {
                     const done = progress[s.id] || 0;
                     return (
@@ -651,21 +678,30 @@ const Tests: React.FC = () => {
                   Wybierz lub utwórz sesję („Zmień/dodaj sesję”).
                 </div>
               ) : !currentStudentId ? (
-                <div className="text-gray-500">Wybierz ucznia z listy po lewej.</div>
+                <div className="text-gray-500">
+                  Wybierz ucznia z listy po lewej.
+                </div>
               ) : (
                 <>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-lg">
                       Wyniki —{" "}
-                      {students.find((s) => s.id === currentStudentId)?.firstName}{" "}
-                      {students.find((s) => s.id === currentStudentId)?.lastName}
+                      {
+                        students.find((s) => s.id === currentStudentId)
+                          ?.firstName
+                      }{" "}
+                      {
+                        students.find((s) => s.id === currentStudentId)
+                          ?.lastName
+                      }
                     </h3>
                     <div className="text-sm text-gray-500">
-                      Sesja: <span className="font-semibold">{sessionName}</span>
+                      Sesja:{" "}
+                      <span className="font-semibold">{sessionName}</span>
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-3  overflow-y-auto max-h-[53vh]">
                     {tasks.map((t, idx) => {
                       const err = taskErrors[t.id];
                       return (
@@ -673,21 +709,24 @@ const Tests: React.FC = () => {
                           key={t.id}
                           className="flex items-start md:items-end gap-3 bg-[#f7fafc] rounded-lg px-4 py-3"
                         >
-                          <div className="min-w-[72px] font-bold mt-1">Zad. {t.order}</div>
+                          <div className="min-w-[72px] font-bold mt-1">
+                            Zad. {t.order}
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium break-words whitespace-pre-wrap">
                               {t.description}
                             </div>
                             <div className="text-xs text-gray-400">
-                              Dozwolone: {t.minPoints}–{t.maxPoints} pkt (krok 0.5)
+                              ({t.minPoints}–{t.maxPoints}pkt) 
                             </div>
                           </div>
                           <div className="w-32">
                             <label className="block text-xs mb-1">Punkty</label>
                             <input
-                              type="text"
-                              inputMode="decimal"
-                              pattern="^\\d+([.,](0|5))?$"
+                              type="number"
+                              step="0.5"
+                              min={t.minPoints}
+                              max={t.maxPoints}
                               placeholder="np. 3 lub 3,5"
                               value={t.points ?? ""}
                               onChange={(e) => setTaskPoints(t, e.target.value)}
@@ -701,7 +740,11 @@ const Tests: React.FC = () => {
                                   : "border-gray-300 focus:border-teal-400"
                               }`}
                             />
-                            {err && <div className="text-[11px] text-red-600 mt-1">{err}</div>}
+                            {err && (
+                              <div className="text-[11px] text-red-600 mt-1">
+                                {err}
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -753,7 +796,9 @@ const Tests: React.FC = () => {
           />
           <div className="relative bg-white rounded-2xl shadow-2xl w-[96%] max-w-5xl max-h-[80vh] p-6 overflow-hidden">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-[#222B45]">Wczytaj lub stwórz nowy test</h3>
+              <h3 className="text-xl font-bold text-[#222B45]">
+                Wczytaj lub stwórz nowy test
+              </h3>
               <button
                 onClick={() => setShowSessionModal(false)}
                 aria-label="Zamknij"
@@ -820,12 +865,15 @@ const Tests: React.FC = () => {
                         {sessions.map((s, idx) => {
                           const isLast = idx === sessions.length - 1;
                           const isEditing = editId === s.id;
-                          const duplicate = isEditing && isDuplicateRename(s.id, editName);
+                          const duplicate =
+                            isEditing && isDuplicateRename(s.id, editName);
                           const selected = selectedLoadId === s.id;
                           return (
                             <tr
                               key={s.id}
-                              className={`${!isLast ? "border-b" : ""} transition hover:bg-gray-50 ${
+                              className={`${
+                                !isLast ? "border-b" : ""
+                              } transition hover:bg-gray-50 ${
                                 selected ? "bg-teal-50" : ""
                               }`}
                               style={{
@@ -849,7 +897,9 @@ const Tests: React.FC = () => {
                                           : "border-gray-300 focus:border-teal-400"
                                       }`}
                                       value={editName}
-                                      onChange={(e) => setEditName(e.target.value)}
+                                      onChange={(e) =>
+                                        setEditName(e.target.value)
+                                      }
                                       onClick={(e) => e.stopPropagation()}
                                       autoFocus
                                     />
@@ -876,7 +926,8 @@ const Tests: React.FC = () => {
                                     </button>
                                     {duplicate && (
                                       <div className="text-[11px] text-red-600 ml-1">
-                                        Sesja o tej nazwie i dla tego szablonu już istnieje.
+                                        Sesja o tej nazwie i dla tego szablonu
+                                        już istnieje.
                                       </div>
                                     )}
                                   </div>
@@ -927,7 +978,10 @@ const Tests: React.FC = () => {
                         })}
                         {sessions.length === 0 && (
                           <tr>
-                            <td colSpan={4} className="py-10 text-center text-gray-400">
+                            <td
+                              colSpan={4}
+                              className="py-10 text-center text-gray-400"
+                            >
                               No sessions to display.
                             </td>
                           </tr>
@@ -959,11 +1013,17 @@ const Tests: React.FC = () => {
             ) : (
               <div className="space-y-3">
                 <div className="relative">
-                  <label className="block text-xs text-gray-500 mb-1">Template</label>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Szablon testu
+                  </label>
                   <select
-                    className="border border-gray-300 rounded-lg px-3 pr-8 py-2 bg-white font-medium text-sm focus:outline-none focus:border-teal-400 w-full appearance-none"
+                    className="border border-gray-300 rounded-lg px-3 pr-10 py-2 bg-white font-medium text-sm focus:outline-none focus:border-teal-400 w-full truncate appearance-none"
                     value={templateId}
-                    onChange={(e) => setTemplateId(e.target.value ? Number(e.target.value) : "")}
+                    onChange={(e) =>
+                      setTemplateId(
+                        e.target.value ? Number(e.target.value) : ""
+                      )
+                    }
                   >
                     <option value="">Wybierz szablon…</option>
                     {templates.map((t) => (
@@ -972,27 +1032,41 @@ const Tests: React.FC = () => {
                       </option>
                     ))}
                   </select>
-                  <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-gray-500">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <span className="pointer-events-none absolute inset-y-0 right-3 top-5 flex items-center text-gray-500">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
                       <path d="M6 9l6 6 6-6" />
                     </svg>
                   </span>
                 </div>
 
                 <div>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Nazwa testu
+                  </label>
                   <div className="flex gap-2">
                     <input
                       value={sessionName}
                       onChange={(e) => setSessionName(e.target.value)}
                       className={`border rounded-lg px-3 py-2 flex-1 focus:outline-none ${
-                        duplicateName ? "border-red-400 focus:border-red-500" : "border-gray-300 focus:border-teal-400"
+                        duplicateName
+                          ? "border-red-400 focus:border-red-500"
+                          : "border-gray-300 focus:border-teal-400"
                       }`}
                       placeholder="Nazwa sesji (np. Sprawdzian z września)"
                     />
                     <button
                       onClick={handleCreate}
                       className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition disabled:opacity-50"
-                      disabled={!templateId || !sessionName.trim() || duplicateName}
+                      disabled={
+                        !templateId || !sessionName.trim() || duplicateName
+                      }
                     >
                       Utwórz
                     </button>

@@ -276,4 +276,37 @@ router.get("/:testId/progress", authenticateJWT, async (req: Request, res: Respo
   res.json(progress);
 });
 
+/**
+ * GET /test-templates/:templateId/tasks
+ * Zwraca zadania szablonu o danym templateId.
+ */
+router.get(
+  "/test-templates/:templateId/tasks",
+  authenticateJWT,
+  async (req: Request, res: Response) => {
+    const tplId = parseInt(req.params.templateId, 10);
+    if (!tplId) {
+      res.status(400).json({ error: "Nieprawidłowe templateId." });
+      return;
+    }
+    try {
+      const tasks = await prisma.testTask.findMany({
+        where: { templateId: tplId },
+        orderBy: { order: "asc" },
+        select: {
+          id: true,
+          description: true,
+          order: true,
+          minPoints: true,
+          maxPoints: true,
+        },
+      });
+      res.json(tasks);
+    } catch (e) {
+      console.error("GET /test-templates/:templateId/tasks error:", e);
+      res.status(500).json({ error: "Błąd pobierania zadań szablonu." });
+    }
+  }
+);
+
 export default router;
