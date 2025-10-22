@@ -276,7 +276,7 @@ const TestTemplates: React.FC = () => {
       setTemplates((prev) => prev.filter((t) => t.id !== id));
       setMessage({ type: "success", text: "Szablon został usunięty." });
     } catch {
-      setMessage({ type: "error", text: "Błąd usuwania szablonu." });
+      setMessage({ type: "error", text: "Usuń sesje testów powiązanych z tym szablonem, aby móc usunąć szablon." });
     }
   };
 
