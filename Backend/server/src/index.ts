@@ -7,6 +7,7 @@ import classRoutes from "./routes/classRoutes";
 import studentRoutes from "./routes/studentRoutes";
 import testTemplateRoutes from "./routes/testTemplateRoutes";
 import testsRoutes from "./routes/testsRoutes";
+import resultsRoutes from "./routes/resultsRoutes";
 
 const app = express();
 app.use(cors());
@@ -18,6 +19,7 @@ app.use("/test-templates", testTemplateRoutes);
 app.use("/", classRoutes);
 app.use("/", studentRoutes);
 app.use("/tests", testsRoutes);
+app.use("/results", resultsRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`Serwer działa na porcie ${PORT}`));
