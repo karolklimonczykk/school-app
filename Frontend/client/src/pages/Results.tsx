@@ -64,6 +64,8 @@ type Overview = {
 };
 
 type TaskMetric = "p" | "q" | "f" | "variance" | "discrimination";
+type StudentMetric = "percent" | "points";
+
 // Legendy/metadane do opisów metryk
 const metricLegend: Record<TaskMetric, string> = {
   p: "Współczynnik łatwości (p) [0–1]",
@@ -101,6 +103,7 @@ const Results: React.FC = () => {
   // Zakładki na stronie
   const [tab, setTab] = useState<"tasks" | "students">("tasks");
   const [taskMetric, setTaskMetric] = useState<TaskMetric>("p");
+  const [studentMetric, setStudentMetric] = useState<StudentMetric>("percent");
 
   // --- OŚ Y dla wykresu zadań (zależna od taskMetric) ---
   const yAxisTasks = useMemo(() => {
@@ -121,16 +124,26 @@ const Results: React.FC = () => {
     };
   }, [taskMetric]);
 
-  // --- OŚ Y dla wykresu uczniów (stała) ---
-  const yAxisStudents = useMemo(
-    () => ({
-      ticks: [0, 25, 50, 75, 100],
-      toPct: (v: number) => v,
-      format: (v: number) => `${v}%`,
-      title: "Procent wyniku [%]",
-    }),
-    []
-  );
+  // --- OŚ Y dla wykresu uczniów (zależna od trybu + MAX pkt) ---
+  const yAxisStudents = useMemo(() => {
+    const max = overview?.header.totalMax ?? 0;
+    if (!overview || max <= 0 || studentMetric === "percent") {
+      return {
+        ticks: [0, 25, 50, 75, 100],
+        toPct: (v: number) => v, // 0..100
+        format: (v: number) => `${v}%`,
+        title: "Procent wyniku [%]",
+      };
+    }
+    // tryb punktowy: 0..MAX pkt, pięć równych podziałek
+    const tickVals = [0, 0.25 * max, 0.5 * max, 0.75 * max, 1 * max];
+    return {
+      ticks: tickVals,
+      toPct: (v: number) => (v / max) * 100,
+      format: (v: number) => (v % 1 === 0 ? `${v}` : v.toFixed(2)),
+      title: `Suma punktów [0–${max}]`,
+    };
+  }, [overview, studentMetric]);
 
   // Prefiltry z URL
   useEffect(() => {
@@ -265,12 +278,29 @@ const Results: React.FC = () => {
   const studentBars = useMemo(() => {
     if (!overview) return [];
     const max = overview.header.totalMax || 1;
+
+    if (studentMetric === "percent") {
+      return overview.students.map((s, idx) => ({
+        lp: idx + 1,
+        value: (s.total / max) * 100, // wysokość w %
+        raw: (s.total / max) * 100, // wartość do etykiety
+        label: `${Math.round((s.total / max) * 100)}%`,
+        tooltip: `Lp. ${idx + 1}: ${s.total.toFixed(2)} pkt (${(
+          (s.total / max) *
+          100
+        ).toFixed(0)}%)`,
+      }));
+    }
+
+    // tryb punktowy
     return overview.students.map((s, idx) => ({
       lp: idx + 1,
-      value: (s.total / max) * 100,
-      raw: s.total,
+      value: (s.total / max) * 100, // wysokość nadal w %
+      raw: s.total, // wartość do etykiety
+      label: s.total % 1 === 0 ? `${s.total}` : s.total.toFixed(2),
+      tooltip: `Lp. ${idx + 1}: ${s.total.toFixed(2)} pkt`,
     }));
-  }, [overview]);
+  }, [overview, studentMetric]);
 
   // Eksport CSV (jednym plikiem; sekcja STUDENTS i ITEMS)
   const exportCSV = () => {
@@ -875,12 +905,42 @@ const Results: React.FC = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-6">
+                  {/* Wykres (uczniowie wg Lp.) */}
                   <div className="bg-white rounded-xl shadow-md p-4">
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-3">
                       <h3 className="font-bold">Wykres (uczniowie wg Lp.)</h3>
-                      <div className="text-xs text-gray-500">
-                        Procent wyniku [%] względem maks.{" "}
-                        {overview.header.totalMax} pkt
+
+                      <div className="flex items-center gap-3">
+                        <div className="text-xs text-gray-500 whitespace-nowrap">
+                          {studentMetric === "percent"
+                            ? `Skala: 0–100% (MAX: ${overview.header.totalMax} pkt)`
+                            : `Skala: 0–${overview.header.totalMax} pkt`}
+                        </div>
+
+                        <div className="relative inline-block">
+                          <select
+                            className="border border-gray-300 rounded-lg px-3 pr-8 py-1.5 bg-white text-sm focus:outline-none focus:border-teal-400"
+                            value={studentMetric}
+                            onChange={(e) =>
+                              setStudentMetric(e.target.value as StudentMetric)
+                            }
+                          >
+                            <option value="percent">% wyniku</option>
+                            <option value="points">Suma punktów</option>
+                          </select>
+                          <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-gray-500">
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path d="M6 9l6 6 6-6" />
+                            </svg>
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -899,16 +959,17 @@ const Results: React.FC = () => {
 
                       {/* Pudełko wykresu */}
                       <div className="relative h-64 border border-gray-100 rounded-lg">
+                        {/* Obszar roboczy (rezerwa na X-etykiety) */}
                         <div className="absolute inset-x-3 top-3 bottom-6">
                           <div className="relative h-full flex">
-                            {/* Wartości Y */}
+                            {/* Wartości osi Y – idealnie na liniach (ten sam fix co wcześniej) */}
                             <div className="relative w-10 mr-2">
                               {yAxisStudents.ticks.map((t) => {
                                 const pct = yAxisStudents.toPct(t);
                                 const isZero = Math.abs(pct) < 1e-6;
                                 return (
                                   <div
-                                    key={t}
+                                    key={String(t)}
                                     className="absolute left-0 text-[10px] leading-[10px] text-gray-400 text-right w-full pr-1 pointer-events-none select-none"
                                     style={
                                       isZero
@@ -916,33 +977,36 @@ const Results: React.FC = () => {
                                             bottom: 0,
                                             transform: "translateY(1px)",
                                           }
-                                        : { bottom: `calc(${pct}% - 3px)` }
+                                        : { bottom: `calc(${pct}% - 5px)` }
                                     }
                                   >
-                                    {yAxisStudents.format(t)}
+                                    {yAxisStudents.format(
+                                      typeof t === "number" ? t : Number(t)
+                                    )}
                                   </div>
                                 );
                               })}
                             </div>
 
-                            {/* Linie + słupki */}
+                            {/* Linie pomocnicze + słupki */}
                             <div className="relative flex-1">
-                              {yAxisStudents.ticks.map((t) => {
-                                const pct = yAxisStudents.toPct(t);
-                                return (
-                                  <div
-                                    key={t}
-                                    className="absolute left-0 right-0"
-                                    style={{
-                                      bottom: `${pct}%`,
-                                      borderTop:
-                                        pct === 0
-                                          ? "2px solid #e5e7eb"
-                                          : "1px dashed #e5e7eb",
-                                    }}
-                                  />
-                                );
-                              })}
+                              {yAxisStudents.ticks.map((t) => (
+                                <div
+                                  key={`g-${String(t)}`}
+                                  className="absolute left-0 right-0"
+                                  style={{
+                                    bottom: `${yAxisStudents.toPct(
+                                      typeof t === "number" ? t : Number(t)
+                                    )}%`,
+                                    borderTop:
+                                      yAxisStudents.toPct(
+                                        typeof t === "number" ? t : Number(t)
+                                      ) === 0
+                                        ? "1px solid #e5e7eb"
+                                        : "1px dashed #eee",
+                                  }}
+                                />
+                              ))}
 
                               <div
                                 className="relative h-full grid gap-2"
@@ -967,9 +1031,7 @@ const Results: React.FC = () => {
                                             Math.min(100, b.value)
                                           )}%`,
                                         }}
-                                        title={`Lp. ${b.lp}: ${fmt2(
-                                          b.raw
-                                        )} pkt`}
+                                        title={b.tooltip}
                                       />
                                       <div
                                         className="absolute left-1/2 -translate-x-1/2 text-[10px] text-gray-600"
@@ -980,7 +1042,7 @@ const Results: React.FC = () => {
                                           )}% + 4px)`,
                                         }}
                                       >
-                                        {fmt2(b.raw)}
+                                        {b.label}
                                       </div>
                                     </div>
                                   </div>
@@ -990,8 +1052,10 @@ const Results: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Etykiety X – wyrównane do obszaru słupków */}
+                        {/* Oś X (Lp.) wewnątrz pudełka */}
+                        {/* Oś X (Lp.) – wyrównana do słupków: lewy spacer = szerokość osi Y */}
                         <div className="absolute inset-x-3 bottom-0 h-6 flex">
+                          {/* lewy spacer = tyle, co kolumna z wartościami osi Y (w-10 mr-2) */}
                           <div className="w-10 mr-2" />
                           <div
                             className="flex-1 grid gap-2 h-full items-start text-center text-[10px] text-gray-500"
