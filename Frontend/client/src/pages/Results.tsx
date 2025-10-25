@@ -63,21 +63,56 @@ type Overview = {
   };
 };
 
-type TaskMetric = "p" | "q" | "f" | "variance" | "discrimination";
+type TaskMetric =
+  | "p"
+  | "q"
+  | "f"
+  | "varianceRaw" // wartości rzeczywiste
+  | "discriminationRaw"; // wartości rzeczywiste (mogą być ujemne)
+
 type StudentMetric = "percent" | "points";
 
 // Legendy/metadane do opisów metryk
 const metricLegend: Record<TaskMetric, string> = {
-  p: "Współczynnik łatwości (p)",
-  q: "Trudność (q)",
-  f: "Frakcja opuszczeń (f)",
-  variance: "Wariancja (wykres: znormalizowana do 0–100%)",
-  discrimination:
-    "Moc różnicująca (wykres: znormalizowana do 0–100%)",
+  p: "Współczynnik łatwości (p) [0–1]",
+  q: "Trudność (q) [0–1]",
+  f: "Frakcja opuszczeń (f) [0–1]",
+  varianceRaw: "Wariancja (S²)",
+  discriminationRaw: "Moc różnicująca (r) [-1,1]",
 };
 // Konfiguracja osi Y dla wykresu zadań
 
 const fmt2 = (x: number) => (Number.isFinite(x) ? x.toFixed(2) : String(x));
+// "Ładne" ticki osi (D3-like)
+const niceNum = (range: number, round: boolean) => {
+  const exponent = Math.floor(Math.log10(range || 1));
+  const fraction = range / Math.pow(10, exponent);
+  let niceFraction: number;
+  if (round) {
+    if (fraction < 1.5) niceFraction = 1;
+    else if (fraction < 3) niceFraction = 2;
+    else if (fraction < 7) niceFraction = 5;
+    else niceFraction = 10;
+  } else {
+    if (fraction <= 1) niceFraction = 1;
+    else if (fraction <= 2) niceFraction = 2;
+    else if (fraction <= 5) niceFraction = 5;
+    else niceFraction = 10;
+  }
+  return niceFraction * Math.pow(10, exponent);
+};
+
+const makeNiceTicks = (min: number, max: number, count = 5) => {
+  const range = niceNum(max - min || 1, false);
+  const step = niceNum(range / (count - 1), true);
+  const niceMin = Math.floor(min / step) * step;
+  const niceMax = Math.ceil(max / step) * step;
+  const ticks: number[] = [];
+  for (let v = niceMin; v <= niceMax + 1e-10; v += step) {
+    ticks.push(Number(v.toFixed(10)));
+  }
+  return { ticks, niceMin, niceMax, step };
+};
 
 const Results: React.FC = () => {
   const token = localStorage.getItem("token");
@@ -107,22 +142,55 @@ const Results: React.FC = () => {
 
   // --- OŚ Y dla wykresu zadań (zależna od taskMetric) ---
   const yAxisTasks = useMemo(() => {
+    // fallback – gdy brak danych, żeby nic się nie wywaliło
+    const items = overview?.items ?? [];
+    const maxVar = items.length ? Math.max(...items.map((i) => i.variance)) : 1;
+    const discMin = items.length
+      ? Math.min(...items.map((i) => i.discrimination))
+      : -1;
+    const discMax = items.length
+      ? Math.max(...items.map((i) => i.discrimination))
+      : 1;
+
+    // metryki 0..1
     if (["p", "q", "f"].includes(taskMetric)) {
       return {
         ticks: [0, 0.25, 0.5, 0.75, 1],
-        toPct: (v: number) => v * 100, // pozycjonowanie linii/etykiet w %
-        format: (v: number) => v.toFixed(2), // opis przy liniach
-        title: metricLegend[taskMetric],
+        toPct: (v: number) => v * 100, // v ∈ [0..1]
+        format: (v: number) => v.toFixed(2),
+        title: metricLegend[taskMetric as TaskMetric],
+        zeroPct: 0,
       };
     }
-    // metryki normalizowane do 0–100%
+
+    // Wariancja (raw) – skala rzeczywista 0..niceMax
+    if (taskMetric === "varianceRaw") {
+      const safeMax = Math.max(0, maxVar);
+      const { ticks, niceMin, niceMax } = makeNiceTicks(0, safeMax || 1, 5);
+      const range = niceMax - niceMin || 1;
+      return {
+        ticks,
+        toPct: (v: number) => ((v - niceMin) / range) * 100,
+        format: (v: number) => v.toFixed(2),
+        title: metricLegend.varianceRaw,
+        zeroPct: ((0 - niceMin) / range) * 100,
+      };
+    }
+
+    // Moc różnicująca (raw) – skala rzeczywista (obejmuje ujemne)
+    // domyślnie wymuszamy przedział co najmniej [-1,1]
+    const dMin = Math.min(-1, discMin);
+    const dMax = Math.max(1, discMax);
+    const { ticks, niceMin, niceMax } = makeNiceTicks(dMin, dMax, 5);
+    const range = niceMax - niceMin || 1;
     return {
-      ticks: [0, 25, 50, 75, 100],
-      toPct: (v: number) => v,
-      format: (v: number) => `${v}%`,
-      title: metricLegend[taskMetric],
+      ticks,
+      toPct: (v: number) => ((v - niceMin) / range) * 100,
+      format: (v: number) => v.toFixed(2),
+      title: metricLegend.discriminationRaw,
+      zeroPct: ((0 - niceMin) / range) * 100,
     };
-  }, [taskMetric]);
+  }, [taskMetric, overview]);
 
   // --- OŚ Y dla wykresu uczniów (zależna od trybu + MAX pkt) ---
   const yAxisStudents = useMemo(() => {
@@ -239,38 +307,18 @@ const Results: React.FC = () => {
   // Normalizacja do wykresu słupkowego (0..100%)
   const taskBars = useMemo(() => {
     if (!overview) return [];
-    if (overview.items.length === 0) return [];
-
-    if (taskMetric === "variance") {
-      const maxVar = Math.max(
-        ...overview.items.map((i) => i.variance),
-        0.00001
-      );
-      return overview.items.map((i) => ({
-        id: i.id,
-        order: i.order,
-        value: (i.variance / maxVar) * 100,
-        raw: i.variance,
-        label: i.order,
-      }));
-    }
-    if (taskMetric === "discrimination") {
-      // mapowanie [-1..1] -> [0..1]
-      return overview.items.map((i) => ({
-        id: i.id,
-        order: i.order,
-        value: ((i.discrimination + 1) / 2) * 100,
-        raw: i.discrimination,
-        label: i.order,
-      }));
-    }
-    const pick = (i: ItemStat) =>
-      taskMetric === "p" ? i.p : taskMetric === "q" ? i.q : i.f;
+    const pickRaw = (i: ItemStat) => {
+      if (taskMetric === "p") return i.p;
+      if (taskMetric === "q") return i.q;
+      if (taskMetric === "f") return i.f;
+      if (taskMetric === "varianceRaw") return i.variance;
+      if (taskMetric === "discriminationRaw") return i.discrimination;
+      return 0;
+    };
     return overview.items.map((i) => ({
       id: i.id,
       order: i.order,
-      value: Math.max(0, Math.min(100, pick(i) * 100)),
-      raw: pick(i),
+      raw: pickRaw(i),
       label: i.order,
     }));
   }, [overview, taskMetric]);
@@ -409,14 +457,16 @@ const Results: React.FC = () => {
         <div className="w-full mx-auto">
           {/* Nagłówek */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
-            <h2 className="text-2xl font-bold text-[#222B45]">Wyniki i analiza testów</h2>
+            <h2 className="text-2xl font-bold text-[#222B45]">
+              Wyniki i analiza testów
+            </h2>
             <div className="flex items-center gap-3">
               <button
                 onClick={exportCSV}
                 disabled={!overview}
                 className="bg-teal-400 hover:bg-teal-300 disabled:opacity-50 text-white font-semibold px-5 py-2 rounded-lg transition"
               >
-                Eksport CSV
+                Eksportuj do Excela (CSV)
               </button>
             </div>
           </div>
@@ -589,7 +639,9 @@ const Results: React.FC = () => {
                   </div>
                 </div>
                 <div className="bg-white rounded-xl shadow-md p-4">
-                  <div className="text-xs text-gray-400">Rzetelność testu α Cronbacha</div>
+                  <div className="text-xs text-gray-400">
+                    Rzetelność testu α Cronbacha
+                  </div>
                   <div className="font-semibold">
                     {overview.summary.alpha.toFixed(2)}
                   </div>
@@ -652,9 +704,9 @@ const Results: React.FC = () => {
                             <option value="p">Łatwość (p)</option>
                             <option value="q">Trudność (q)</option>
                             <option value="f">Frakcja opuszczeń (f)</option>
-                            <option value="variance">Wariancja (norm.)</option>
-                            <option value="discrimination">
-                              Moc różnicująca (norm.)
+                            <option value="varianceRaw">Wariancja (S²)</option>
+                            <option value="discriminationRaw">
+                              Moc różnicująca (r)
                             </option>
                           </select>
                           <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-gray-500">
@@ -675,20 +727,19 @@ const Results: React.FC = () => {
 
                     {/* Siatka: [kolumna tytułu Y | pudełko wykresu] */}
                     <div
-                      className="grid gap-x-3"
-                      style={{ gridTemplateColumns: "56px 1fr" }}
+                      className="grid"
+                      style={{ gridTemplateColumns: "8px 1fr" }}
                     >
                       {/* Tytuł osi Y (bez obramowania) */}
-                      <div className="relative h-64">
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+                      <div className="relative h-74">
+                        <div className="absolute inset-0 flex items-center justify-center pl-[4px]">
                           <div className="-rotate-90 text-xs text-gray-500 whitespace-nowrap">
                             {yAxisTasks.title}
                           </div>
                         </div>
                       </div>
-
                       {/* Pudełko wykresu */}
-                      <div className="relative h-64 border border-gray-100 rounded-lg">
+                      <div className="relative h-74 rounded-lg">
                         {/* Obszar roboczy: padding + rezerwa 24px na X-etykiety */}
                         <div className="absolute inset-x-3 top-3 bottom-6">
                           <div className="relative h-full flex">
@@ -747,38 +798,45 @@ const Results: React.FC = () => {
                                   )}, minmax(0, 1fr))`,
                                 }}
                               >
-                                {taskBars.map((b) => (
-                                  <div
-                                    key={b.id}
-                                    className="flex flex-col items-center justify-end"
-                                  >
-                                    <div className="relative h-full w-full flex items-end">
-                                      <div
-                                        className="w-full max-w-[22px] mx-auto bg-teal-400 rounded-t"
-                                        style={{
-                                          height: `${Math.max(
-                                            0,
-                                            Math.min(100, b.value)
-                                          )}%`,
-                                        }}
-                                        title={`Zad. ${b.label}: ${fmt2(
-                                          Number(b.raw)
-                                        )}`}
-                                      />
-                                      <div
-                                        className="absolute left-1/2 -translate-x-1/2 text-[10px] text-gray-600"
-                                        style={{
-                                          bottom: `calc(${Math.max(
-                                            0,
-                                            Math.min(100, b.value)
-                                          )}% + 4px)`,
-                                        }}
-                                      >
-                                        {fmt2(Number(b.raw))}
+                                {taskBars.map((b) => {
+                                  const pct = yAxisTasks.toPct(b.raw);
+                                  const zero = yAxisTasks.zeroPct ?? 0;
+                                  const bottom = Math.min(pct, zero);
+                                  const height = Math.abs(pct - zero);
+
+                                  return (
+                                    <div
+                                      key={b.id}
+                                      className="flex flex-col items-center justify-end"
+                                    >
+                                      <div className="relative h-full w-full">
+                                        {/* słupek – rośnie w górę dla dodatnich i w dół dla ujemnych (przy raw r) */}
+                                        <div
+                                          className="absolute left-1/2 -translate-x-1/2 w-full max-w-[22px] mx-auto bg-teal-400 rounded"
+                                          style={{
+                                            bottom: `${bottom}%`,
+                                            height: `${height}%`,
+                                          }}
+                                          title={`Zad. ${b.label}: ${fmt2(
+                                            Number(b.raw)
+                                          )}`}
+                                        />
+                                        {/* wartość nad końcem słupka (dla ujemnych – nad 0) */}
+                                        <div
+                                          className="absolute left-1/2 -translate-x-1/2 text-[10px] text-gray-600"
+                                          style={{
+                                            bottom: `calc(${Math.max(
+                                              pct,
+                                              zero
+                                            )}% + 4px)`,
+                                          }}
+                                        >
+                                          {fmt2(Number(b.raw))}
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           </div>
@@ -798,11 +856,14 @@ const Results: React.FC = () => {
                             }}
                           >
                             {taskBars.map((b) => (
-                              <div key={b.id}>Z{b.label}</div>
+                              <div key={b.id}>{b.label}</div>
                             ))}
                           </div>
                         </div>
                       </div>
+                    </div>
+                    <div className="text-xs text-gray-500 whitespace-nowrap w-[100%] text-center">
+                      Numer zadania
                     </div>
                   </div>
 
@@ -811,76 +872,66 @@ const Results: React.FC = () => {
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="font-bold">Analiza zadań</h3>
                       <div className="text-xs text-gray-400">
-                        p – łatwość, q – trudność, f – opuszczenia
+                        p – łatwość, q – trudność, f – frakcja opuszczeń, S² –
+                        wariancja, r – moc różnicująca
                       </div>
                     </div>
                     <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
-                      <table className="min-w-full">
+                      <table className="min-w-full ">
                         <thead>
                           <tr>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6">
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6 pr-6">
                               ZAD.
                             </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3">
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
                               OPIS
                             </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3">
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
                               ŚR.PKT
                             </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3">
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
                               p
                             </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3">
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
                               q
                             </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3">
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
                               f
                             </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3">
-                              VAR
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
+                              S²
                             </th>
                             <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
-                              MOC
+                              r
                             </th>
                           </tr>
                         </thead>
                         <tbody>
-                          {overview.items.map((it, idx) => (
+                          {overview.items.map((it) => (
                             <tr
                               key={it.id}
-                              className={`${
-                                idx !== overview.items.length - 1
-                                  ? "border-b"
-                                  : ""
-                              }`}
-                              style={{
-                                borderColor: "#ececec",
-                                borderWidth:
-                                  idx !== overview.items.length - 1
-                                    ? "0.2px"
-                                    : 0,
-                              }}
+                              className="border border-[#ececec] border-width-0.2 transition hover:bg-gray-50" 
                             >
-                              <td className="py-4 pl-6 text-gray-800 font-semibold">
+                              <td className="py-4 pl-6 pr-6 text-gray-800 font-semibold">
                                 {" "}
-                                {it.order}{" "}
+                                {it.order}.{" "}
                               </td>
-                              <td className="py-4 pr-3 text-gray-700 max-w-[900px] break-words whitespace-pre-wrap">
+                              <td className="py-4 pr-6 text-gray-700 max-w-[900px] break-words whitespace-pre-wrap">
                                 {it.description}
                               </td>
-                              <td className="py-4 text-gray-800">
+                              <td className="py-4 pr-6 text-gray-800">
                                 {it.avgPoints.toFixed(2)}
                               </td>
-                              <td className="py-4 text-gray-800">
+                              <td className="py-4 pr-6 text-gray-800">
                                 {it.p.toFixed(2)}
                               </td>
-                              <td className="py-4 text-gray-800">
+                              <td className="py-4 pr-6 text-gray-800">
                                 {it.q.toFixed(2)}
                               </td>
-                              <td className="py-4 text-gray-800">
+                              <td className="py-4 pr-6 text-gray-800">
                                 {it.f.toFixed(2)}
                               </td>
-                              <td className="py-4 text-gray-800">
+                              <td className="py-4 pr-6 text-gray-800">
                                 {it.variance.toFixed(2)}
                               </td>
                               <td className="py-4 pr-6 text-gray-800">
@@ -908,7 +959,7 @@ const Results: React.FC = () => {
                   {/* Wykres (uczniowie wg Lp.) */}
                   <div className="bg-white rounded-xl shadow-md p-4">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-3">
-                      <h3 className="font-bold">Wykres (uczniowie wg Lp.)</h3>
+                      <h3 className="font-bold">Wykres (uczniowie)</h3>
 
                       <div className="flex items-center gap-3">
                         <div className="text-xs text-gray-500 whitespace-nowrap">
@@ -945,20 +996,20 @@ const Results: React.FC = () => {
                     </div>
 
                     <div
-                      className="grid gap-x-3"
-                      style={{ gridTemplateColumns: "56px 1fr" }}
+                      className="grid"
+                      style={{ gridTemplateColumns: "8px 1fr" }}
                     >
                       {/* Tytuł osi Y */}
-                      <div className="relative h-64">
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-                          <div className="-rotate-90 text-xs whitespace-nowrap">
+                      <div className="relative h-74">
+                        <div className="absolute inset-0 flex items-center justify-center pl-[4px]">
+                          <div className="-rotate-90 text-xs text-gray-500 whitespace-nowrap">
                             {yAxisStudents.title}
                           </div>
                         </div>
                       </div>
 
                       {/* Pudełko wykresu */}
-                      <div className="relative h-64 border border-gray-100 rounded-lg">
+                      <div className="relative h-74 rounded-lg">
                         {/* Obszar roboczy (rezerwa na X-etykiety) */}
                         <div className="absolute inset-x-3 top-3 bottom-6">
                           <div className="relative h-full flex">
@@ -977,7 +1028,7 @@ const Results: React.FC = () => {
                                             bottom: 0,
                                             transform: "translateY(1px)",
                                           }
-                                        : { bottom: `calc(${pct}% - 5px)` }
+                                        : { bottom: `calc(${pct}% - 3px)` }
                                     }
                                   >
                                     {yAxisStudents.format(
@@ -1002,7 +1053,7 @@ const Results: React.FC = () => {
                                       yAxisStudents.toPct(
                                         typeof t === "number" ? t : Number(t)
                                       ) === 0
-                                        ? "1px solid #e5e7eb"
+                                        ? "2px solid #e5e7eb"
                                         : "1px dashed #eee",
                                   }}
                                 />
@@ -1024,7 +1075,7 @@ const Results: React.FC = () => {
                                   >
                                     <div className="relative h-full w-full flex items-end">
                                       <div
-                                        className="w-full max-w-[22px] mx-auto bg-[#222B45] rounded-t"
+                                        className="w-full max-w-[22px] mx-auto bg-teal-400 rounded-t"
                                         style={{
                                           height: `${Math.max(
                                             0,
@@ -1071,6 +1122,9 @@ const Results: React.FC = () => {
                         </div>
                       </div>
                     </div>
+                    <div className="text-xs text-gray-500 whitespace-nowrap w-[100%] text-center">
+                      Uczniowie (Lp.)
+                    </div>
                   </div>
 
                   {/* Tabela wyników uczniów */}
@@ -1086,20 +1140,20 @@ const Results: React.FC = () => {
                       <table className="min-w-full">
                         <thead>
                           <tr>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6">
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6 pr-6">
                               Lp.
                             </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3">
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
                               Uczeń
                             </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3">
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
                               Klasa
                             </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3">
-                              Suma pkt
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
+                              Suma
                             </th>
                             <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
-                              % wyniku
+                              Wynik(%)
                             </th>
                           </tr>
                         </thead>
@@ -1107,29 +1161,18 @@ const Results: React.FC = () => {
                           {overview.students.map((r, idx) => (
                             <tr
                               key={r.studentId}
-                              className={`${
-                                idx !== overview.students.length - 1
-                                  ? "border-b"
-                                  : ""
-                              }`}
-                              style={{
-                                borderColor: "#ececec",
-                                borderWidth:
-                                  idx !== overview.students.length - 1
-                                    ? "0.2px"
-                                    : 0,
-                              }}
+                              className="border border-[#ececec] border-width-0.2 transition hover:bg-gray-50"
                             >
-                              <td className="py-4 pl-6 text-gray-800 font-semibold">
+                              <td className="py-4 pl-6 pr-6 text-gray-800 font-semibold">
                                 {idx + 1}
                               </td>
-                              <td className="py-4 text-gray-800 font-semibold break-words">
+                              <td className="py-4 pr-6 text-gray-800 font-semibold break-words">
                                 {r.firstName} {r.lastName}
                               </td>
-                              <td className="py-4 text-gray-700">
+                              <td className="py-4 pr-6 text-gray-700">
                                 {r.className || "-"}
                               </td>
-                              <td className="py-4 text-gray-800">
+                              <td className="py-4 pr-6 text-gray-800">
                                 {r.total.toFixed(2)}
                               </td>
                               <td className="py-4 pr-6 text-gray-800">
