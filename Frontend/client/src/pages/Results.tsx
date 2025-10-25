@@ -68,12 +68,12 @@ type StudentMetric = "percent" | "points";
 
 // Legendy/metadane do opisów metryk
 const metricLegend: Record<TaskMetric, string> = {
-  p: "Współczynnik łatwości (p) [0–1]",
-  q: "Trudność (q) [0–1] = 1 − p",
-  f: "Frakcja opuszczeń (f) [0–1]",
+  p: "Współczynnik łatwości (p)",
+  q: "Trudność (q)",
+  f: "Frakcja opuszczeń (f)",
   variance: "Wariancja (wykres: znormalizowana do 0–100%)",
   discrimination:
-    "Moc różnicująca r ∈ [−1, 1] (wykres: znormalizowana do 0–100%)",
+    "Moc różnicująca (wykres: znormalizowana do 0–100%)",
 };
 // Konfiguracja osi Y dla wykresu zadań
 
@@ -409,7 +409,7 @@ const Results: React.FC = () => {
         <div className="w-full mx-auto">
           {/* Nagłówek */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
-            <h2 className="text-2xl font-bold text-[#222B45]">Results</h2>
+            <h2 className="text-2xl font-bold text-[#222B45]">Wyniki i analiza testów</h2>
             <div className="flex items-center gap-3">
               <button
                 onClick={exportCSV}
@@ -423,7 +423,7 @@ const Results: React.FC = () => {
 
           {/* Filtr: „Wybierz uczniów” */}
           <div className="text-sm font-semibold text-gray-600 mb-2">
-            Wybierz uczniów
+            Wybierz uczniów i sesję do analizy wyników
           </div>
 
           {/* Filtry zakresu + wybór sesji */}
@@ -468,7 +468,7 @@ const Results: React.FC = () => {
             {/* Klasa */}
             <div className="relative inline-block">
               <select
-                className="border border-gray-300 rounded-lg px-3 pr-10 py-2 bg-white font-medium text-sm focus:outline-none focus:border-teal-400 truncate"
+                className="border border-gray-300 rounded-lg px-3 pr-10 py-2 bg-white font-medium text-sm focus:outline-none focus:border-teal-400 truncate appearance-none"
                 value={selectedClassId}
                 onChange={(e) => {
                   const val = e.target.value ? Number(e.target.value) : "";
@@ -589,7 +589,7 @@ const Results: React.FC = () => {
                   </div>
                 </div>
                 <div className="bg-white rounded-xl shadow-md p-4">
-                  <div className="text-xs text-gray-400">α Cronbacha</div>
+                  <div className="text-xs text-gray-400">Rzetelność testu α Cronbacha</div>
                   <div className="font-semibold">
                     {overview.summary.alpha.toFixed(2)}
                   </div>
@@ -643,7 +643,7 @@ const Results: React.FC = () => {
                         </div>
                         <div className="relative inline-block">
                           <select
-                            className="border border-gray-300 rounded-lg px-3 pr-8 py-1.5 bg-white text-sm focus:outline-none focus:border-teal-400"
+                            className="border border-gray-300 rounded-lg px-3 pr-8 py-1.5 bg-white text-sm focus:outline-none focus:border-teal-400 appearance-none"
                             value={taskMetric}
                             onChange={(e) =>
                               setTaskMetric(e.target.value as TaskMetric)
@@ -919,7 +919,7 @@ const Results: React.FC = () => {
 
                         <div className="relative inline-block">
                           <select
-                            className="border border-gray-300 rounded-lg px-3 pr-8 py-1.5 bg-white text-sm focus:outline-none focus:border-teal-400"
+                            className="border border-gray-300 rounded-lg px-3 pr-8 py-1.5 bg-white text-sm focus:outline-none focus:border-teal-400 appearance-none"
                             value={studentMetric}
                             onChange={(e) =>
                               setStudentMetric(e.target.value as StudentMetric)
@@ -951,7 +951,7 @@ const Results: React.FC = () => {
                       {/* Tytuł osi Y */}
                       <div className="relative h-64">
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-                          <div className="-rotate-90 text-xs text-gray-500 whitespace-nowrap">
+                          <div className="-rotate-90 text-xs whitespace-nowrap">
                             {yAxisStudents.title}
                           </div>
                         </div>
@@ -1051,8 +1051,6 @@ const Results: React.FC = () => {
                             </div>
                           </div>
                         </div>
-
-                        {/* Oś X (Lp.) wewnątrz pudełka */}
                         {/* Oś X (Lp.) – wyrównana do słupków: lewy spacer = szerokość osi Y */}
                         <div className="absolute inset-x-3 bottom-0 h-6 flex">
                           {/* lewy spacer = tyle, co kolumna z wartościami osi Y (w-10 mr-2) */}
