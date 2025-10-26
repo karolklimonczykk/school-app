@@ -236,37 +236,41 @@ const Students: React.FC = () => {
       gender: student.gender,
     });
   };
-  const handleSaveEdit = async (studentId: number, schoolId: number, classId: number) => {
-  const token = localStorage.getItem("token");
-  try {
-    const res = await axios.put(
-      `http://localhost:4000/schools/${schoolId}/classes/${classId}/students/${studentId}`,
-      editStudent,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+  const handleSaveEdit = async (
+    studentId: number,
+    schoolId: number,
+    classId: number
+  ) => {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await axios.put(
+        `http://localhost:4000/schools/${schoolId}/classes/${classId}/students/${studentId}`,
+        editStudent,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-    // KLUCZ: nie kasuj s.class – zachowaj ją po update
-    setStudents((prev) =>
-      prev.map((s) =>
-        s.id === studentId
-          ? { ...s, ...res.data, class: s.class } // <- zachowujemy relację
-          : s
-      )
-    );
+      // KLUCZ: nie kasuj s.class – zachowaj ją po update
+      setStudents((prev) =>
+        prev.map((s) =>
+          s.id === studentId
+            ? { ...s, ...res.data, class: s.class } // <- zachowujemy relację
+            : s
+        )
+      );
 
-    setEditId(null);
-    setEditStudent({ firstName: "", lastName: "", gender: "M" });
-    setMessageType("success");
-    setMessage("Uczeń zaktualizowany!");
-  } catch (err: unknown) {
-    setMessageType("error");
-    setMessage(
-      axios.isAxiosError(err)
-        ? err.response?.data?.error || "Błąd edycji ucznia"
-        : "Błąd edycji ucznia"
-    );
-  }
-};
+      setEditId(null);
+      setEditStudent({ firstName: "", lastName: "", gender: "M" });
+      setMessageType("success");
+      setMessage("Uczeń zaktualizowany!");
+    } catch (err: unknown) {
+      setMessageType("error");
+      setMessage(
+        axios.isAxiosError(err)
+          ? err.response?.data?.error || "Błąd edycji ucznia"
+          : "Błąd edycji ucznia"
+      );
+    }
+  };
 
   const handleCancelEdit = () => {
     setEditId(null);
@@ -572,7 +576,7 @@ const Students: React.FC = () => {
                         {editId === student.id ? (
                           <div className="flex gap-2 items-center w-full flex-wrap">
                             <input
-                              className="border border-gray-300 rounded-lg px-3 py-1 w-28 focus:outline-none focus:border-teal-400"
+                              className="border border-gray-300 rounded-lg px-3 py-1 w-32 focus:outline-none focus:border-teal-400"
                               value={editStudent.firstName}
                               onChange={(e) =>
                                 setEditStudent({
@@ -583,7 +587,7 @@ const Students: React.FC = () => {
                               autoFocus
                             />
                             <input
-                              className="border border-gray-300 rounded-lg px-3 py-1 w-28 focus:outline-none focus:border-teal-400"
+                              className="border border-gray-300 rounded-lg px-3 py-1 w-40 focus:outline-none focus:border-teal-400"
                               value={editStudent.lastName}
                               onChange={(e) =>
                                 setEditStudent({
@@ -592,42 +596,33 @@ const Students: React.FC = () => {
                                 })
                               }
                             />
-                            <select
-                              className="border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:border-teal-400"
-                              value={editStudent.gender}
-                              onChange={(e) =>
-                                setEditStudent({
-                                  ...editStudent,
-                                  gender: e.target.value,
-                                })
-                              }
-                            >
-                              <option value="M">M</option>
-                              <option value="K">K</option>
-                            </select>
-                            <button
-                              className="text-teal-500 font-semibold px-2 py-1 hover:bg-teal-50 rounded transition"
-                              onClick={() =>
-                                handleSaveEdit(
-                                  student.id,
-                                  student.class?.school?.id ??
-                                    (classes.find(
-                                      (c) => c.id === student.classId
-                                    )?.schoolId as number),
-                                  student.classId
-                                )
-                              }
-                              type="button"
-                            >
-                              Save
-                            </button>
-                            <button
-                              className="text-gray-400 font-semibold px-2 py-1 hover:bg-gray-100 rounded transition"
-                              onClick={handleCancelEdit}
-                              type="button"
-                            >
-                              Cancel
-                            </button>
+                            <div className="relative inline-block">
+                              <select
+                                className="border border-gray-300 rounded-lg px-2 pr-6 py-1 w-16 focus:outline-none focus:border-teal-400 appearance-none"
+                                value={editStudent.gender}
+                                onChange={(e) =>
+                                  setEditStudent({
+                                    ...editStudent,
+                                    gender: e.target.value,
+                                  })
+                                }
+                              >
+                                <option value="M">M</option>
+                                <option value="K">K</option>
+                              </select>
+                              <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-gray-500">
+                                <svg
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                >
+                                  <path d="M6 9l6 6 6-6" />
+                                </svg>
+                              </span>
+                            </div>
                           </div>
                         ) : (
                           <span className="text-gray-800 font-semibold text-base break-all">
@@ -652,31 +647,59 @@ const Students: React.FC = () => {
                           ""}
                       </td>
                       <td className="pr-6 text-right">
-                        {editId === student.id ? null : (
-                          <div className="flex gap-3 justify-end">
-                            <button
-                              className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
-                              onClick={() => handleStartEdit(student)}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
-                              onClick={() =>
-                                handleDeleteStudent(
-                                  student.id,
-                                  student.class?.school?.id ??
-                                    (classes.find(
-                                      (c) => c.id === student.classId
-                                    )?.schoolId as number),
-                                  student.classId
-                                )
-                              }
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex gap-3 justify-center">
+                          {editId === student.id ? (
+                            <>
+                              <button
+                                className="text-teal-500 font-semibold px-2 py-1 hover:bg-teal-50 rounded transition"
+                                onClick={() =>
+                                  handleSaveEdit(
+                                    student.id,
+                                    student.class?.school?.id ??
+                                      (classes.find(
+                                        (c) => c.id === student.classId
+                                      )?.schoolId as number),
+                                    student.classId
+                                  )
+                                }
+                                type="button"
+                              >
+                                Save
+                              </button>
+                              <button
+                                className="text-gray-400 font-semibold px-2 py-1 hover:bg-gray-100 rounded transition"
+                                onClick={handleCancelEdit}
+                                type="button"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
+                                onClick={() => handleStartEdit(student)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
+                                onClick={() =>
+                                  handleDeleteStudent(
+                                    student.id,
+                                    student.class?.school?.id ??
+                                      (classes.find(
+                                        (c) => c.id === student.classId
+                                      )?.schoolId as number),
+                                    student.classId
+                                  )
+                                }
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))

@@ -189,17 +189,30 @@ const Schools: React.FC = () => {
                       borderWidth: idx !== schools.length - 1 ? "0.2px" : 0,
                     }}
                   >
-                    <td
-                      className="flex items-center gap-4 py-5 pl-6 min-w-[250px]"
-                    >
+                    <td className="flex items-center gap-4 py-5 pl-6 min-w-[250px]">
                       {editId === school.id ? (
-                        <div className="flex gap-2 items-center w-full">
+                        // TRYB EDYCJI
+                        <div className="w-full -my-1">
                           <input
-                            className="border border-gray-300 rounded-lg px-3 py-1 w-52 focus:outline-none focus:border-teal-400"
+                            className="border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:border-teal-400 w-full"
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
                             autoFocus
                           />
+                        </div>
+                      ) : (
+                        <Link
+                          to={`/classes?school=${school.id}`}
+                          className="text-gray-800 font-semibold text-base hover:underline break-all"
+                        >
+                          {school.name}
+                        </Link>
+                      )}
+                    </td>
+
+                    <td className="pr-6 text-right">
+                      {editId === school.id ? (
+                        <div className="flex gap-3 justify-center">
                           <button
                             className="text-teal-500 font-semibold px-2 py-1 hover:bg-teal-50 rounded transition"
                             onClick={() => handleSaveEdit(school.id)}
@@ -216,16 +229,6 @@ const Schools: React.FC = () => {
                           </button>
                         </div>
                       ) : (
-                        <Link
-                          to={`/classes?school=${school.id}`}
-                          className="text-gray-800 font-semibold text-base hover:underline break-all"
-                        >
-                          {school.name}
-                        </Link>
-                      )}
-                    </td>
-                    <td className="pr-6 text-right">
-                      {editId === school.id ? null : (
                         <div className="flex gap-3 justify-end">
                           <button
                             className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"

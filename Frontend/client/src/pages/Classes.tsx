@@ -33,6 +33,7 @@ const Classes: React.FC = () => {
 
   const location = useLocation();
   const navigate = useNavigate();
+
   // Obsługa "prefiltracji" przez query string (np. /classes?school=3)
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -46,9 +47,7 @@ const Classes: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Przy pierwszym wejściu, jeśli jeszcze nie masz szkół, poczekaj!
     if (schools.length === 0) return;
-    // Jeśli filtr ustawiony na daną szkołę i nie masz szkół, poczekaj!
     if (selectedSchoolId !== "" && schools.length === 0) return;
     fetchClasses();
     // eslint-disable-next-line
@@ -75,7 +74,6 @@ const Classes: React.FC = () => {
     setMessage("");
     try {
       if (selectedSchoolId) {
-        // Filtr po szkole (bez zmian)
         const res = await axios.get<SchoolClass[]>(
           `http://localhost:4000/schools/${selectedSchoolId}/classes`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -90,7 +88,6 @@ const Classes: React.FC = () => {
           }))
         );
       } else {
-        // Pobierz klasy dla wszystkich szkół użytkownika
         const res = await axios.get<SchoolClass[]>(
           "http://localhost:4000/classes",
           { headers: { Authorization: `Bearer ${token}` } }
@@ -115,7 +112,7 @@ const Classes: React.FC = () => {
         setMessage("Błąd pobierania klasy");
       }
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   };
 
@@ -155,11 +152,12 @@ const Classes: React.FC = () => {
     }
   };
 
-  // Edytuj klasę
+  // Edycja
   const handleStartEdit = (cls: SchoolClass) => {
     setEditId(cls.id);
     setEditName(cls.name);
   };
+
   const handleSaveEdit = async (classId: number, schoolId: number) => {
     const token = localStorage.getItem("token");
     try {
@@ -186,6 +184,7 @@ const Classes: React.FC = () => {
       );
     }
   };
+
   const handleCancelEdit = () => {
     setEditId(null);
     setEditName("");
@@ -214,13 +213,13 @@ const Classes: React.FC = () => {
   const handleFilterSchool = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     setSelectedSchoolId(value ? Number(value) : "");
-    // Podmień query string
     if (value) {
       navigate(`/classes?school=${value}`);
     } else {
       navigate("/classes");
     }
   };
+
   return (
     <div className="min-h-screen flex bg-[#f7fafc]">
       <Sidebar />
@@ -270,7 +269,7 @@ const Classes: React.FC = () => {
                     setMessage("Wybierz szkołę, do której chcesz dodać klasę!");
                     return;
                   }
-                  setMessageType(""); // czyść poprzedni typ
+                  setMessageType("");
                   setMessage("");
                   setShowAddInput(true);
                 }}
@@ -280,6 +279,7 @@ const Classes: React.FC = () => {
               </button>
             </div>
           </div>
+
           {/* Dodawanie klasy */}
           {showAddInput && selectedSchoolId && (
             <form
@@ -328,6 +328,7 @@ const Classes: React.FC = () => {
               {message}
             </div>
           )}
+
           {/* Tabela */}
           <div className="bg-white rounded-xl shadow-md overflow-x-auto w-full">
             <table className="min-w-full">
@@ -362,35 +363,19 @@ const Classes: React.FC = () => {
                       className="transition hover:bg-gray-50"
                       style={{
                         borderColor: "#ececec",
-                        borderWidth: idx !== classes.length - 1 ? "0.2px" : 0,
+                        borderWidth:
+                          idx !== classes.length - 1 ? "0.2px" : 0,
                       }}
                     >
-                      <td className="flex items-center gap-4 py-5 pl-6 min-w-[210px]">
+                      {/* COL 1: CLASS NAME / input */}
+                      <td className="flex items-center gap-4 py-5 pl-6 min-w-[250px]">
                         {editId === cls.id ? (
-                          <div className="flex gap-2 items-center w-full">
                             <input
-                              className="border border-gray-300 rounded-lg px-3 py-1 w-52 focus:outline-none focus:border-teal-400"
+                              className="border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:border-teal-400"
                               value={editName}
                               onChange={(e) => setEditName(e.target.value)}
                               autoFocus
                             />
-                            <button
-                              className="text-teal-500 font-semibold px-2 py-1 hover:bg-teal-50 rounded transition"
-                              onClick={() =>
-                                handleSaveEdit(cls.id, cls.schoolId)
-                              }
-                              type="button"
-                            >
-                              Save
-                            </button>
-                            <button
-                              className="text-gray-400 font-semibold px-2 py-1 hover:bg-gray-100 rounded transition"
-                              onClick={handleCancelEdit}
-                              type="button"
-                            >
-                              Cancel
-                            </button>
-                          </div>
                         ) : (
                           <Link
                             to={`/students?school=${cls.schoolId}&class=${cls.id}`}
@@ -400,30 +385,55 @@ const Classes: React.FC = () => {
                           </Link>
                         )}
                       </td>
+
+                      {/* COL 2: SCHOOL NAME */}
                       <td className="pl-6 text-gray-500 min-w-[180px]">
                         {cls.schoolName ||
                           schools.find((s) => s.id === cls.schoolId)?.name ||
                           ""}
                       </td>
+
+                      {/* COL 3: ACTIONS */}
                       <td className="pr-6 text-right">
-                        {editId === cls.id ? null : (
-                          <div className="flex gap-3 justify-end">
-                            <button
-                              className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
-                              onClick={() => handleStartEdit(cls)}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
-                              onClick={() =>
-                                handleDeleteClass(cls.id, cls.schoolId)
-                              }
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex gap-3 justify-center">
+                          {editId === cls.id ? (
+                            <>
+                              <button
+                                className="text-teal-500 font-semibold px-2 py-1 hover:bg-teal-50 rounded transition"
+                                onClick={() =>
+                                  handleSaveEdit(cls.id, cls.schoolId)
+                                }
+                                type="button"
+                              >
+                                Save
+                              </button>
+                              <button
+                                className="text-gray-400 font-semibold px-2 py-1 hover:bg-gray-100 rounded transition"
+                                onClick={handleCancelEdit}
+                                type="button"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
+                                onClick={() => handleStartEdit(cls)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
+                                onClick={() =>
+                                  handleDeleteClass(cls.id, cls.schoolId)
+                                }
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
