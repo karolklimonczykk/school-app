@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Sidebar from "../components/Sidebar/Sidebar";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 // Typ szkoły
 type School = {
@@ -116,7 +116,6 @@ const Schools: React.FC = () => {
       }
     }
   };
-  const navigate = useNavigate();
   return (
     <div className="min-h-screen flex bg-[#f7fafc]">
       <Sidebar />
@@ -192,9 +191,6 @@ const Schools: React.FC = () => {
                   >
                     <td
                       className="flex items-center gap-4 py-5 pl-6 min-w-[250px]"
-                      onDoubleClick={() =>
-                        navigate(`/classes?school=${school.id}`)
-                      }
                     >
                       {editId === school.id ? (
                         <div className="flex gap-2 items-center w-full">
