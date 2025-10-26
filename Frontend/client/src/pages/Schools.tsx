@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Sidebar from "../components/Sidebar/Sidebar";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 // Typ szkoły
 type School = {
@@ -31,7 +31,9 @@ const Schools: React.FC = () => {
       });
       setSchools(res.data);
     } catch {
-      setMessage("Nie udało się pobrać szkół (upewnij się, że jesteś zalogowany/a)");
+      setMessage(
+        "Nie udało się pobrać szkół (upewnij się, że jesteś zalogowany/a)"
+      );
     }
   };
 
@@ -75,7 +77,9 @@ const Schools: React.FC = () => {
         { name: editName },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setSchools(schools.map(s => (s.id === id ? { ...s, name: editName } : s)));
+      setSchools(
+        schools.map((s) => (s.id === id ? { ...s, name: editName } : s))
+      );
       setEditId(null);
       setEditName("");
       setMessage("Nazwa szkoły została zmieniona.");
@@ -102,7 +106,7 @@ const Schools: React.FC = () => {
       await axios.delete(`http://localhost:4000/schools/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setSchools(schools.filter(s => s.id !== id));
+      setSchools(schools.filter((s) => s.id !== id));
       setMessage("Szkoła została usunięta.");
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
@@ -112,7 +116,7 @@ const Schools: React.FC = () => {
       }
     }
   };
-
+  const navigate = useNavigate();
   return (
     <div className="min-h-screen flex bg-[#f7fafc]">
       <Sidebar />
@@ -130,12 +134,15 @@ const Schools: React.FC = () => {
           </div>
           {/* Form dodawania */}
           {showForm && (
-            <form onSubmit={handleAddSchool} className="mb-7 flex gap-2 items-end">
+            <form
+              onSubmit={handleAddSchool}
+              className="mb-7 flex gap-2 items-end"
+            >
               <input
                 type="text"
                 placeholder="Nazwa szkoły"
                 value={name}
-                onChange={e => setName(e.target.value)}
+                onChange={(e) => setName(e.target.value)}
                 required
                 className="border border-gray-300 rounded-lg px-4 py-2 flex-1 focus:outline-none focus:border-teal-400"
               />
@@ -167,7 +174,9 @@ const Schools: React.FC = () => {
             <table className="min-w-full">
               <thead>
                 <tr>
-                  <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6">SCHOOL NAME</th>
+                  <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6">
+                    SCHOOL NAME
+                  </th>
                   <th className="w-40"></th>
                 </tr>
               </thead>
@@ -175,23 +184,24 @@ const Schools: React.FC = () => {
                 {schools.map((school, idx) => (
                   <tr
                     key={school.id}
-                    className={`${
-                      idx !== schools.length - 1
-                        ? "border-b"
-                        : ""
-                    } transition`}
+                    className="transition hover:bg-gray-50"
                     style={{
                       borderColor: "#ececec",
                       borderWidth: idx !== schools.length - 1 ? "0.2px" : 0,
                     }}
                   >
-                    <td className="flex items-center gap-4 py-5 pl-6 min-w-[250px]">
+                    <td
+                      className="flex items-center gap-4 py-5 pl-6 min-w-[250px]"
+                      onDoubleClick={() =>
+                        navigate(`/classes?school=${school.id}`)
+                      }
+                    >
                       {editId === school.id ? (
                         <div className="flex gap-2 items-center w-full">
                           <input
                             className="border border-gray-300 rounded-lg px-3 py-1 w-52 focus:outline-none focus:border-teal-400"
                             value={editName}
-                            onChange={e => setEditName(e.target.value)}
+                            onChange={(e) => setEditName(e.target.value)}
                             autoFocus
                           />
                           <button

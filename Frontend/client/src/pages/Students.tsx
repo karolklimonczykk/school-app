@@ -562,10 +562,10 @@ const Students: React.FC = () => {
                   students.map((student, idx) => (
                     <tr
                       key={student.id}
-                      className={idx !== students.length - 1 ? "border-b" : ""}
+                      className="transition hover:bg-gray-50"
                       style={{
                         borderColor: "#ececec",
-                        borderWidth: idx !== students.length - 1 ? "0.5px" : 0,
+                        borderWidth: idx !== students.length - 1 ? "0.2px" : 0,
                       }}
                     >
                       <td className="flex items-center gap-4 py-5 pl-6 min-w-[210px]">

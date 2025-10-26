@@ -32,7 +32,6 @@ const Classes: React.FC = () => {
   const [showAddInput, setShowAddInput] = useState(false);
 
   const location = useLocation();
-  const navigate = useNavigate();
 
   // Obsługa "prefiltracji" przez query string (np. /classes?school=3)
   useEffect(() => {
@@ -222,7 +221,7 @@ const Classes: React.FC = () => {
       navigate("/classes");
     }
   };
-
+  const navigate = useNavigate();
   return (
     <div className="min-h-screen flex bg-[#f7fafc]">
       <Sidebar />
@@ -361,13 +360,13 @@ const Classes: React.FC = () => {
                   classes.map((cls, idx) => (
                     <tr
                       key={cls.id}
-                      className={idx !== classes.length - 1 ? "border-b" : ""}
+                      className="transition hover:bg-gray-50"
                       style={{
                         borderColor: "#ececec",
-                        borderWidth: idx !== classes.length - 1 ? "0.5px" : 0,
+                        borderWidth: idx !== classes.length - 1 ? "0.2px" : 0,
                       }}
                     >
-                      <td className="flex items-center gap-4 py-5 pl-6 min-w-[210px]">
+                      <td className="flex items-center gap-4 py-5 pl-6 min-w-[210px]" onDoubleClick={() => navigate(`/students?school=${cls.schoolId}&class=${cls.id}`)}>
                         {editId === cls.id ? (
                           <div className="flex gap-2 items-center w-full">
                             <input
