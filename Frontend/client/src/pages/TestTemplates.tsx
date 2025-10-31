@@ -373,12 +373,15 @@ const TestTemplates: React.FC = () => {
                   {addTasks.map((task, idx) => (
                     <div
                       key={idx}
-                      className="flex flex-wrap gap-3 items-end mb-3 bg-[#f7fafc] rounded-lg px-4 py-3"
+                      className="flex flex-wrap gap-3 items-center mb-3 bg-[#f7fafc] rounded-lg px-4 py-3"
                     >
                       <span className="font-bold mr-2 min-w-[80px]">
                         Zadanie {idx + 1}.
                       </span>
-
+                      <div className="min-w-[250px] flex-1">
+                      <label className="block text-xs mb-1">
+                          Opis zadania
+                      </label>
                       <input
                         type="text"
                         placeholder="Opis zadania"
@@ -386,9 +389,10 @@ const TestTemplates: React.FC = () => {
                         onChange={(e) =>
                           updateAddTask(idx, "description", e.target.value)
                         }
-                        className="border border-gray-300 rounded-lg px-3 py-2 w-full max-w-[320px] focus:outline-none focus:border-teal-400"
+                        className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:border-teal-400"
                         required
                       />
+                      </div>
 
                       <div>
                         <label className="block text-xs mb-1">
@@ -410,7 +414,7 @@ const TestTemplates: React.FC = () => {
                             className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
                             required
                           />
-                          <span className="mx-1 text-gray-500">/</span>
+                          <span className="mx-1 mt-2 text-gray-500">/</span>
                           <input
                             type="number"
                             min={task.minPoints}
@@ -428,7 +432,14 @@ const TestTemplates: React.FC = () => {
                           />
                         </div>
                       </div>
-
+                      <div>
+                        <label className="block text-xs mb-1">
+                          Punkty połówkowe
+                        </label>
+                        <input
+                          type="checkbox"
+                          /> Zezwalaj
+                        </div>
                       <button
                         type="button"
                         className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-2 transition"
