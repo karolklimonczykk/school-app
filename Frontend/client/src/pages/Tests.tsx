@@ -874,131 +874,127 @@ const Tests: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {sessions.map((s, idx) => {
-                          const isLast = idx === sessions.length - 1;
-                          const isEditing = editId === s.id;
-                          const duplicate =
-                            isEditing && isDuplicateRename(s.id, editName);
-                          const selected = selectedLoadId === s.id;
-                          return (
-                            <tr
-                              key={s.id}
-                              className={`${
-                                !isLast ? "border-b" : ""
-                              } transition hover:bg-gray-50 ${
-                                selected ? "bg-teal-50" : ""
-                              }`}
-                              style={{
-                                borderColor: "#ececec",
-                                borderWidth: !isLast ? "0.2px" : 0,
-                                cursor: isEditing ? "default" : "pointer",
-                              }}
-                              onClick={() => {
-                                if (!isEditing) setSelectedLoadId(s.id);
-                              }}
-                              aria-selected={selected}
-                            >
-                              {/* Nazwa / edycja */}
-                              <td className="py-5 pl-6 min-w-[250px]">
-                                {isEditing ? (
-                                  <div className="flex gap-2 items-center w-full">
-                                    <input
-                                      className={`border rounded-lg px-3 py-1 w-52 focus:outline-none ${
-                                        duplicate
-                                          ? "border-red-300 focus:border-red-500"
-                                          : "border-gray-300 focus:border-teal-400"
-                                      }`}
-                                      value={editName}
-                                      onChange={(e) =>
-                                        setEditName(e.target.value)
-                                      }
-                                      onClick={(e) => e.stopPropagation()}
-                                      autoFocus
-                                    />
-                                    <button
-                                      className="text-teal-500 font-semibold px-2 py-1 hover:bg-teal-50 rounded transition disabled:opacity-50"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleSaveEdit(s.id);
-                                      }}
-                                      type="button"
-                                      disabled={!editName.trim() || !!duplicate}
-                                    >
-                                      Save
-                                    </button>
-                                    <button
-                                      className="text-gray-400 font-semibold px-2 py-1 hover:bg-gray-100 rounded transition"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleCancelEdit();
-                                      }}
-                                      type="button"
-                                    >
-                                      Cancel
-                                    </button>
-                                    {duplicate && (
-                                      <div className="text-[11px] text-red-600 ml-1">
-                                        Sesja o tej nazwie i dla tego szablonu
-                                        już istnieje.
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-800 font-semibold text-base break-all">
-                                    {s.name}
-                                  </span>
-                                )}
-                              </td>
+  {sessions.map((s, idx) => {
+    const isLast = idx === sessions.length - 1;
+    const isEditing = editId === s.id;
+    const duplicate = isEditing && isDuplicateRename(s.id, editName);
+    const selected = selectedLoadId === s.id;
 
-                              {/* Template */}
-                              <td className="text-gray-800 py-5">
-                                {s.template?.name || "-"}
-                              </td>
+    return (
+      <tr
+        key={s.id}
+        className={`${!isLast ? "border-b" : ""} transition hover:bg-gray-50 ${
+          selected ? "bg-teal-50" : ""
+        }`}
+        style={{
+          borderColor: "#ececec",
+          borderWidth: !isLast ? "0.2px" : 0,
+          cursor: isEditing ? "default" : "pointer",
+        }}
+        onClick={() => {
+          if (!isEditing) setSelectedLoadId(s.id);
+        }}
+        aria-selected={selected}
+      >
+        {/* kolumna z nazwą / inputem */}
+        <td className="py-5 pl-6 min-w-[250px] pr-4">
+          {isEditing ? (
+            <div className="flex flex-col gap-1 w-full max-w-xs">
+              <input
+                className={`border rounded-lg px-3 py-1 focus:outline-none ${
+                  duplicate
+                    ? "border-red-300 focus:border-red-500"
+                    : "border-gray-300 focus:border-teal-400"
+                }`}
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                autoFocus
+              />
+              {duplicate && (
+                <div className="text-[11px] text-red-600">
+                  Sesja o tej nazwie i dla tego szablonu już istnieje.
+                </div>
+              )}
+            </div>
+          ) : (
+            <span className="text-gray-800 font-semibold text-base break-all">
+              {s.name}
+            </span>
+          )}
+        </td>
 
-                              {/* Data */}
-                              <td className="text-gray-800 py-5">
-                                {new Date(s.date).toLocaleDateString()}
-                              </td>
+        {/* Template */}
+        <td className="text-gray-800 py-5 pr-4">
+          {s.template?.name || "-"}
+        </td>
 
-                              {/* Akcje */}
-                              <td className="pr-6 text-right">
-                                {!isEditing && (
-                                  <div className="flex gap-3 justify-end">
-                                    <button
-                                      className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleStartEdit(s);
-                                      }}
-                                    >
-                                      Edit
-                                    </button>
-                                    <button
-                                      className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDelete(s.id);
-                                      }}
-                                    >
-                                      Delete
-                                    </button>
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {sessions.length === 0 && (
-                          <tr>
-                            <td
-                              colSpan={4}
-                              className="py-10 text-center text-gray-400"
-                            >
-                              No sessions to display.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
+        {/* Data */}
+        <td className="text-gray-800 py-5 pr-4">
+          {new Date(s.date).toLocaleDateString()}
+        </td>
+
+        {/* Akcje */}
+        <td className="pr-6 text-right">
+          {isEditing ? (
+            <div className="flex gap-3 justify-end">
+              <button
+                className="text-teal-500 font-semibold px-3 py-1 hover:bg-teal-50 rounded transition disabled:opacity-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSaveEdit(s.id);
+                }}
+                type="button"
+                disabled={!editName.trim() || !!duplicate}
+              >
+                Save
+              </button>
+              <button
+                className="text-gray-400 font-semibold px-3 py-1 hover:bg-gray-100 rounded transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCancelEdit();
+                }}
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-3 justify-end">
+              <button
+                className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStartEdit(s);
+                }}
+              >
+                Edit
+              </button>
+              <button
+                className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(s.id);
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          )}
+        </td>
+      </tr>
+    );
+  })}
+  {sessions.length === 0 && (
+    <tr>
+      <td colSpan={4} className="py-10 text-center text-gray-400">
+        No sessions to display.
+      </td>
+    </tr>
+  )}
+</tbody>
+
                     </table>
                   </div>
 
