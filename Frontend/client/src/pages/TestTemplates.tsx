@@ -8,6 +8,7 @@ type TaskDraft = {
   description: string;
   minPoints: number;
   maxPoints: number;
+  allowHalfPoints: boolean;
 };
 
 type TaskView = {
@@ -15,6 +16,7 @@ type TaskView = {
   description: string;
   minPoints: number;
   maxPoints: number;
+  allowHalfPoints: boolean;
 };
 
 type TestTemplate = {
@@ -22,6 +24,9 @@ type TestTemplate = {
   name: string;
   tasks: TaskView[];
 };
+
+const snapByRule = (v: number, halves: boolean) =>
+  halves ? Math.round(v * 2) / 2 : Math.round(v);
 
 const TestTemplates: React.FC = () => {
   // Lista szablonów
@@ -38,7 +43,7 @@ const TestTemplates: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [addName, setAddName] = useState("");
   const [addTasks, setAddTasks] = useState<TaskDraft[]>([
-    { description: "", minPoints: 0, maxPoints: 1 },
+    { description: "", minPoints: 0, maxPoints: 1, allowHalfPoints: true },
   ]);
 
   // --- Edycja (MODAL) ---
@@ -46,7 +51,7 @@ const TestTemplates: React.FC = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [editTasks, setEditTasks] = useState<TaskDraft[]>([
-    { description: "", minPoints: 0, maxPoints: 1 },
+    { description: "", minPoints: 0, maxPoints: 1, allowHalfPoints: true },
   ]);
 
   // ---------------------------------
@@ -77,16 +82,20 @@ const TestTemplates: React.FC = () => {
   // ---------------------------------
   const resetAddForm = () => {
     setAddName("");
-    setAddTasks([{ description: "", minPoints: 0, maxPoints: 1 }]);
+    setAddTasks([
+      { description: "", minPoints: 0, maxPoints: 1, allowHalfPoints: true },
+    ]);
   };
 
   const resetEditForm = () => {
     setEditingId(null);
     setEditName("");
-    setEditTasks([{ description: "", minPoints: 0, maxPoints: 1 }]);
+    setEditTasks([
+      { description: "", minPoints: 0, maxPoints: 1, allowHalfPoints: true },
+    ]);
   };
 
-  // ---- VALIATION: duplicate names for add/edit (case-insensitive, trimmed) ----
+  // ---- WALIDACJA: duplikaty nazw (case-insensitive, trimmed) ----
   const duplicateAddName = React.useMemo(() => {
     const base = addName.trim().toLowerCase();
     if (!base) return false;
@@ -97,8 +106,7 @@ const TestTemplates: React.FC = () => {
     const base = name.trim().toLowerCase();
     if (!base || id === null) return false;
     return templates.some(
-      (t) =>
-        t.id !== id && (t.name || "").trim().toLowerCase() === base
+      (t) => t.id !== id && (t.name || "").trim().toLowerCase() === base
     );
   };
 
@@ -134,6 +142,7 @@ const TestTemplates: React.FC = () => {
             order: order + 1,
             minPoints: t.minPoints,
             maxPoints: t.maxPoints,
+            allowHalfPoints: t.allowHalfPoints,
           },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -168,8 +177,16 @@ const TestTemplates: React.FC = () => {
             description: t.description,
             minPoints: t.minPoints,
             maxPoints: t.maxPoints,
+            allowHalfPoints: t.allowHalfPoints ?? true,
           }))
-        : [{ description: "", minPoints: 0, maxPoints: 1 }]
+        : [
+            {
+              description: "",
+              minPoints: 0,
+              maxPoints: 1,
+              allowHalfPoints: true,
+            },
+          ]
     );
     setEditOpen(true);
   };
@@ -213,6 +230,7 @@ const TestTemplates: React.FC = () => {
               order: order + 1,
               minPoints: t.minPoints,
               maxPoints: t.maxPoints,
+              allowHalfPoints: t.allowHalfPoints,
             },
             { headers: { Authorization: `Bearer ${token}` } }
           );
@@ -226,6 +244,7 @@ const TestTemplates: React.FC = () => {
               order: order + 1,
               minPoints: t.minPoints,
               maxPoints: t.maxPoints,
+              allowHalfPoints: t.allowHalfPoints,
             },
             { headers: { Authorization: `Bearer ${token}` } }
           );
@@ -276,7 +295,10 @@ const TestTemplates: React.FC = () => {
       setTemplates((prev) => prev.filter((t) => t.id !== id));
       setMessage({ type: "success", text: "Szablon został usunięty." });
     } catch {
-      setMessage({ type: "error", text: "Usuń sesje testów powiązanych z tym szablonem, aby móc usunąć szablon." });
+      setMessage({
+        type: "error",
+        text: "Usuń sesje testów powiązanych z tym szablonem, aby móc usunąć szablon.",
+      });
     }
   };
 
@@ -284,9 +306,14 @@ const TestTemplates: React.FC = () => {
   // Helpers UI (dodawanie/edycja zadań)
   // ---------------------------------
   const addAddTask = () =>
-    setAddTasks((s) => [...s, { description: "", minPoints: 0, maxPoints: 1 }]);
+    setAddTasks((s) => [
+      ...s,
+      { description: "", minPoints: 0, maxPoints: 1, allowHalfPoints: true },
+    ]);
+
   const removeAddTask = (idx: number) =>
     setAddTasks((s) => (s.length === 1 ? s : s.filter((_, i) => i !== idx)));
+
   const updateAddTask = (idx: number, key: keyof TaskDraft, value: any) =>
     setAddTasks((s) =>
       s.map((t, i) => (i === idx ? { ...t, [key]: value } : t))
@@ -295,10 +322,12 @@ const TestTemplates: React.FC = () => {
   const addEditTask = () =>
     setEditTasks((s) => [
       ...s,
-      { description: "", minPoints: 0, maxPoints: 1 },
+      { description: "", minPoints: 0, maxPoints: 1, allowHalfPoints: true },
     ]);
+
   const removeEditTask = (idx: number) =>
     setEditTasks((s) => (s.length === 1 ? s : s.filter((_, i) => i !== idx)));
+
   const updateEditTask = (idx: number, key: keyof TaskDraft, value: any) =>
     setEditTasks((s) =>
       s.map((t, i) => (i === idx ? { ...t, [key]: value } : t))
@@ -329,7 +358,7 @@ const TestTemplates: React.FC = () => {
             </button>
           </div>
 
-          {/* Komunikaty (nad blokiem tworzenia nowego szablonu) */}
+          {/* Komunikaty */}
           {message && (
             <div
               className={`mb-4 text-center font-medium text-sm rounded-lg py-2 px-4 ${
@@ -343,7 +372,8 @@ const TestTemplates: React.FC = () => {
               {message.text}
             </div>
           )}
-          {/* Formularz DODAWANIA (blok pojawia się po kliknięciu) */}
+
+          {/* Formularz DODAWANIA */}
           {showAddForm && (
             <div className="bg-white rounded-xl shadow-md p-6 mb-8">
               <h3 className="text-lg font-bold mb-4">Nowy szablon testu</h3>
@@ -373,73 +403,117 @@ const TestTemplates: React.FC = () => {
                   {addTasks.map((task, idx) => (
                     <div
                       key={idx}
-                      className="flex flex-wrap gap-3 items-center mb-3 bg-[#f7fafc] rounded-lg px-4 py-3"
+                      className="flex flex-wrap gap-4 items-center mb-3 bg-[#f7fafc] rounded-lg px-4 py-3"
                     >
                       <span className="font-bold mr-2 min-w-[80px]">
                         Zadanie {idx + 1}.
                       </span>
-                      <div className="min-w-[250px] flex-1">
-                      <label className="block text-xs mb-1">
-                          Opis zadania
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Opis zadania"
-                        value={task.description}
-                        onChange={(e) =>
-                          updateAddTask(idx, "description", e.target.value)
-                        }
-                        className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:border-teal-400"
-                        required
-                      />
-                      </div>
 
-                      <div>
+                      <div className="min-w-[250px] flex-1">
                         <label className="block text-xs mb-1">
-                          Punkty min/max
+                          Opis zadania
                         </label>
-                        <div className="flex gap-1">
-                          <input
-                            type="number"
-                            min={0}
-                            step={0.5}
-                            value={task.minPoints}
-                            onChange={(e) =>
-                              updateAddTask(
-                                idx,
-                                "minPoints",
-                                Number(e.target.value)
-                              )
-                            }
-                            className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
-                            required
-                          />
-                          <span className="mx-1 mt-2 text-gray-500">/</span>
-                          <input
-                            type="number"
-                            min={task.minPoints}
-                            step={0.5}
-                            value={task.maxPoints}
-                            onChange={(e) =>
-                              updateAddTask(
-                                idx,
-                                "maxPoints",
-                                Number(e.target.value)
-                              )
-                            }
-                            className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
-                            required
-                          />
-                        </div>
+                        <input
+                          type="text"
+                          placeholder="Opis zadania"
+                          value={task.description}
+                          onChange={(e) =>
+                            updateAddTask(idx, "description", e.target.value)
+                          }
+                          className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:border-teal-400"
+                          required
+                        />
                       </div>
                       <div>
                         <label className="block text-xs mb-1">
+                          Punkty min/max{" "}
+                          <span className="text-gray-500 ">
+                            (krok: {task.allowHalfPoints ? "0.5" : "1"})
+                          </span>
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={task.allowHalfPoints ? 0.5 : 1}
+                          value={task.minPoints}
+                          onChange={(e) =>
+                            setAddTasks((s) =>
+                              s.map((t, i) => {
+                                if (i !== idx) return t;
+                                const halves = t.allowHalfPoints;
+                                const newMin = snapByRule(
+                                  Number(e.target.value),
+                                  halves
+                                );
+                                const newMax =
+                                  newMin > t.maxPoints ? newMin : t.maxPoints;
+                                return {
+                                  ...t,
+                                  minPoints: newMin,
+                                  maxPoints: snapByRule(newMax, halves),
+                                };
+                              })
+                            )
+                          }
+                          className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
+                          required
+                        />
+                        <span className="mx-1 mt-2 text-gray-500">/</span>
+                        <input
+                          type="number"
+                          min={task.minPoints}
+                          step={task.allowHalfPoints ? 0.5 : 1}
+                          value={task.maxPoints}
+                          onChange={(e) =>
+                            setAddTasks((s) =>
+                              s.map((t, i) => {
+                                if (i !== idx) return t;
+                                const halves = t.allowHalfPoints;
+                                const raw = Number(e.target.value);
+                                const clamped =
+                                  raw < t.minPoints ? t.minPoints : raw;
+                                return {
+                                  ...t,
+                                  maxPoints: snapByRule(clamped, halves),
+                                };
+                              })
+                            )
+                          }
+                          className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
+                          required
+                        />
+                      </div>
+                      <div className="min-h-[62px] text-center">
+                        <label className="block text-xs mb-3">
                           Punkty połówkowe
                         </label>
                         <input
+                          className="relative h-4 w-4 cursor-pointer transition-all before:absolute before:top-2/4 before:left-2/4 before:block before:h-10 before:w-10 before:-translate-y-2/4 before:-translate-x-2/4 before:rounded-full before:bg-slate-400 before:opacity-0 before:transition-opacity checked:bg-slate-800 checked:before:bg-slate-400 hover:before:opacity-10 "
                           type="checkbox"
-                          /> Zezwalaj
-                        </div>
+                          checked={task.allowHalfPoints}
+                          onChange={(e) => {
+                            const halves = e.target.checked;
+                            setAddTasks((s) =>
+                              s.map((t, i) =>
+                                i === idx
+                                  ? {
+                                      ...t,
+                                      allowHalfPoints: halves,
+                                      minPoints: snapByRule(
+                                        t.minPoints,
+                                        halves
+                                      ),
+                                      maxPoints: snapByRule(
+                                        Math.max(t.maxPoints, t.minPoints),
+                                        halves
+                                      ),
+                                    }
+                                  : t
+                              )
+                            );
+                          }}
+                        />
+                      </div>
                       <button
                         type="button"
                         className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-2 transition"
@@ -493,9 +567,10 @@ const TestTemplates: React.FC = () => {
               {templates.map((template) => (
                 <div
                   key={template.id}
-                  className="bg-white rounded-xl shadow p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                  className="bg-white rounded-xl shadow p-5 flex flex-col gap-3"
                 >
-                  <div>
+                  {/* tekst na całą szerokość */}
+                  <div className="flex-1">
                     <span className="font-bold text-lg">{template.name}</span>
                     <div className="mt-2">
                       {template.tasks.length === 0 ? (
@@ -508,15 +583,18 @@ const TestTemplates: React.FC = () => {
                             </span>{" "}
                             {task.description}{" "}
                             <span className="text-xs text-gray-400">
-                              ({task.minPoints}-{task.maxPoints} pkt)
+                              ({task.minPoints}-{task.maxPoints} pkt,{" "}
+                              {task.allowHalfPoints
+                                ? "połówki: TAK"
+                                : "połówki: NIE"}
+                              )
                             </span>
                           </div>
                         ))
                       )}
                     </div>
                   </div>
-
-                  <div className="flex gap-3 mt-3 sm:mt-0">
+                  <div className="flex gap-3 justify-end self-end">
                     <button
                       className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
                       onClick={() => openEdit(template)}
@@ -570,58 +648,110 @@ const TestTemplates: React.FC = () => {
               {editTasks.map((task, idx) => (
                 <div
                   key={idx}
-                  className="flex flex-wrap gap-3 items-end mb-3 bg-[#f7fafc] rounded-lg px-4 py-3"
+                  className="flex flex-wrap gap-4 items-center mb-3 bg-[#f7fafc] rounded-lg px-4 py-3"
                 >
                   <span className="font-bold mr-2 min-w-[80px]">
                     Zadanie {idx + 1}.
                   </span>
-
-                  <input
-                    type="text"
-                    placeholder="Opis zadania"
-                    value={task.description}
-                    onChange={(e) =>
-                      updateEditTask(idx, "description", e.target.value)
-                    }
-                    className="border border-gray-300 rounded-lg px-3 py-2 w-full max-w-[320px] focus:outline-none focus:border-teal-400"
-                    required
-                  />
-
+                  <div className="min-w-[250px] flex-1">
+                    <label className="block text-xs mb-1">Opis zadania</label>
+                    <input
+                      type="text"
+                      placeholder="Opis zadania"
+                      value={task.description}
+                      onChange={(e) =>
+                        updateEditTask(idx, "description", e.target.value)
+                      }
+                      className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:border-teal-400"
+                      required
+                    />
+                  </div>
                   <div>
-                    <label className="block text-xs mb-1">Punkty min/max</label>
-                    <div className="flex gap-1">
-                      <input
-                        type="number"
-                        min={0}
-                        step={0.5}
-                        value={task.minPoints}
-                        onChange={(e) =>
-                          updateEditTask(
-                            idx,
-                            "minPoints",
-                            Number(e.target.value)
+                    <label className="block text-xs mb-1">
+                      Punkty min/max{" "}
+                      <span className="text-gray-500 ">
+                        (krok: {task.allowHalfPoints ? "0.5" : "1"})
+                      </span>
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={task.allowHalfPoints ? 0.5 : 1}
+                      value={task.minPoints}
+                      onChange={(e) =>
+                        setEditTasks((s) =>
+                          s.map((t, i) => {
+                            if (i !== idx) return t;
+                            const halves = t.allowHalfPoints;
+                            const newMin = snapByRule(
+                              Number(e.target.value),
+                              halves
+                            );
+                            const newMax =
+                              newMin > t.maxPoints ? newMin : t.maxPoints;
+                            return {
+                              ...t,
+                              minPoints: newMin,
+                              maxPoints: snapByRule(newMax, halves),
+                            };
+                          })
+                        )
+                      }
+                      className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
+                      required
+                    />
+                    <span className="mx-1 text-gray-500">/</span>
+                    <input
+                      type="number"
+                      min={task.minPoints}
+                      step={task.allowHalfPoints ? 0.5 : 1}
+                      value={task.maxPoints}
+                      onChange={(e) =>
+                        setEditTasks((s) =>
+                          s.map((t, i) => {
+                            if (i !== idx) return t;
+                            const halves = t.allowHalfPoints;
+                            const raw = Number(e.target.value);
+                            const clamped =
+                              raw < t.minPoints ? t.minPoints : raw;
+                            return {
+                              ...t,
+                              maxPoints: snapByRule(clamped, halves),
+                            };
+                          })
+                        )
+                      }
+                      className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
+                      required
+                    />
+                  </div>
+                  <div className="min-h-[62px] text-center">
+                    <label className="block text-xs mb-3">
+                      Punkty połówkowe
+                    </label>
+                    <input
+                      className="relative h-4 w-4 cursor-pointer transition-all before:absolute before:top-2/4 before:left-2/4 before:block before:h-10 before:w-10 before:-translate-y-2/4 before:-translate-x-2/4 before:rounded-full before:bg-slate-400 before:opacity-0 before:transition-opacity checked:bg-slate-800 checked:before:bg-slate-400 hover:before:opacity-10 "
+                      type="checkbox"
+                      checked={task.allowHalfPoints}
+                      onChange={(e) => {
+                        const halves = e.target.checked;
+                        setEditTasks((s) =>
+                          s.map((t, i) =>
+                            i === idx
+                              ? {
+                                  ...t,
+                                  allowHalfPoints: halves,
+                                  minPoints: snapByRule(t.minPoints, halves),
+                                  maxPoints: snapByRule(
+                                    Math.max(t.maxPoints, t.minPoints),
+                                    halves
+                                  ),
+                                }
+                              : t
                           )
-                        }
-                        className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
-                        required
-                      />
-                      <span className="mx-1 text-gray-500">/</span>
-                      <input
-                        type="number"
-                        min={task.minPoints}
-                        step={0.5}
-                        value={task.maxPoints}
-                        onChange={(e) =>
-                          updateEditTask(
-                            idx,
-                            "maxPoints",
-                            Number(e.target.value)
-                          )
-                        }
-                        className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
-                        required
-                      />
-                    </div>
+                        );
+                      }}
+                    />
                   </div>
 
                   <button

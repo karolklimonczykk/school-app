@@ -67,6 +67,7 @@ model TestTask {
   description String
   minPoints   Int
   maxPoints   Int
+  allowHalfPoints Boolean @default(true)
   order       Int
   template    TestTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
   templateId  Int

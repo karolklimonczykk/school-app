@@ -61,19 +61,21 @@ router.delete("/:id", authenticateJWT, async (req, res) => {
 // POST: dodaj zadanie do szablonu
 router.post("/:templateId/tasks", authenticateJWT, async (req, res) => {
   const templateId = Number(req.params.templateId);
-  const { description, order, minPoints, maxPoints } = req.body;
+  const { description, order, minPoints, maxPoints, allowHalfPoints } =
+    req.body;
 
   if (!description) {
     res.status(400).json({ error: "Brak opisu" });
     return;
   }
-
+  const half = allowHalfPoints !== false;
   const task = await prisma.testTask.create({
     data: {
       description,
       order,
       minPoints,
       maxPoints,
+      allowHalfPoints: half,
       templateId,
     },
   });
@@ -83,22 +85,26 @@ router.post("/:templateId/tasks", authenticateJWT, async (req, res) => {
 // PUT: edytuj zadanie
 router.put("/:templateId/tasks/:taskId", authenticateJWT, async (req, res) => {
   const taskId = Number(req.params.taskId);
-  const { description, order, minPoints, maxPoints } = req.body;
-
+  const { description, order, minPoints, maxPoints, allowHalfPoints } = req.body;
+   const half = allowHalfPoints !== false;
   const updated = await prisma.testTask.update({
     where: { id: taskId },
-    data: { description, order, minPoints, maxPoints },
+    data: { description, order, minPoints, maxPoints, allowHalfPoints },
   });
   res.json(updated);
 });
 
 // DELETE: usuń zadanie
-router.delete("/:templateId/tasks/:taskId", authenticateJWT, async (req, res) => {
-  const taskId = Number(req.params.taskId);
-  await prisma.testTask.delete({
-    where: { id: taskId },
-  });
-  res.json({ message: "Usunięto zadanie" });
-});
+router.delete(
+  "/:templateId/tasks/:taskId",
+  authenticateJWT,
+  async (req, res) => {
+    const taskId = Number(req.params.taskId);
+    await prisma.testTask.delete({
+      where: { id: taskId },
+    });
+    res.json({ message: "Usunięto zadanie" });
+  }
+);
 
 export default router;

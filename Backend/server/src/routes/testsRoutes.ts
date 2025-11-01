@@ -178,6 +178,7 @@ router.get("/:testId/students/:studentId/results", authenticateJWT, async (req: 
       order: t.order,
       minPoints: t.minPoints,
       maxPoints: t.maxPoints,
+      allowHalfPoints: t.allowHalfPoints,
       points: map.get(t.id) ?? null,
     })),
   });

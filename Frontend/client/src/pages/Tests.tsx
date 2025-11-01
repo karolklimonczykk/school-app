@@ -24,6 +24,7 @@ type Task = {
   minPoints: number;
   maxPoints: number;
   points: number | null;
+  allowHalfPoints: boolean;
 };
 type TestSession = {
   id: number;
@@ -73,11 +74,11 @@ const Tests: React.FC = () => {
   const [sessionTab, setSessionTab] = useState<"load" | "new">("load");
   const [selectedLoadId, setSelectedLoadId] = useState<number | "">("");
 
-  // —— Edycja nazwy wiersza (jak w schools.tsx)
+  // —— Edycja nazwy wiersza
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState<string>("");
 
-  // —— Walidacja duplikatów (nowy test: ta sama nazwa + ten sam szablon)
+  // —— Walidacja duplikatów
   const duplicateName = React.useMemo(() => {
     if (!templateId || !sessionName.trim()) return false;
     const target = sessionName.trim().toLowerCase();
@@ -88,7 +89,7 @@ const Tests: React.FC = () => {
     );
   }, [sessions, templateId, sessionName]);
 
-  // —— Duplikaty przy zmianie nazwy (w obrębie szablonu, z pominięciem edytowanego id)
+  // —— Duplikaty przy zmianie nazwy (w obrębie szablonu)
   const isDuplicateRename = (id: number, name: string) => {
     const base = name.trim().toLowerCase();
     const current = sessions.find((s) => s.id === id);
@@ -101,7 +102,7 @@ const Tests: React.FC = () => {
     );
   };
 
-  // Prefiltry z URL (zostają, ale listy wczytamy dopiero po wyborze sesji)
+  // Prefiltry z URL
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const schoolQuery = params.get("school");
@@ -156,7 +157,7 @@ const Tests: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSchoolId]);
 
-  // LISTA SESJI (do wczytywania) – bez filtrów, bez wyboru szablonu
+  // LISTA SESJI (do wczytywania)
   const fetchSessions = async () => {
     try {
       const res = await axios.get<TestSession[]>(
@@ -178,10 +179,10 @@ const Tests: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showSessionModal]);
 
-  // UCZNIOWIE – wczytuj dopiero po zamknięciu modala i posiadaniu testId
+  // UCZNIOWIE – po zamknięciu modala i posiadaniu testId
   useEffect(() => {
     const run = async () => {
-      if (showSessionModal || !testId) return; // ⬅️ blokada wczytywania „za modalem”
+      if (showSessionModal || !testId) return;
       try {
         if (selectedSchoolId && !selectedClassId) {
           const all = await axios.get<Student[]>(
@@ -228,7 +229,7 @@ const Tests: React.FC = () => {
     schools.length,
   ]);
 
-  // PROGRESS – również po wyborze sesji i zamknięciu modala
+  // PROGRESS
   useEffect(() => {
     const fetchProgress = async () => {
       if (showSessionModal || !testId) return;
@@ -255,7 +256,7 @@ const Tests: React.FC = () => {
     students.length,
   ]);
 
-  // LICZBA ZADAŃ dla aktywnej sesji (po wyborze sesji)
+  // LICZBA ZADAŃ dla aktywnej sesji
   const fetchTasksCount = async (tplId: number) => {
     try {
       const res = await axios.get<any[]>(
@@ -362,7 +363,7 @@ const Tests: React.FC = () => {
     }
   };
 
-  // —— Edycja wiersza (jak w schools.tsx)
+  // —— Edycja wiersza
   const handleStartEdit = (s: TestSession) => {
     setEditId(s.id);
     setEditName(s.name);
@@ -408,19 +409,23 @@ const Tests: React.FC = () => {
     }
   };
 
-  // Walidacja punktów (połówki, ,/. , zakres)
-  const normalize = (raw: string): number | null => {
+  // Walidacja punktów per-zadanie (połówki vs całkowite) + zakres
+  const normalizeForTask = (raw: string, halves: boolean): number | null => {
     if (raw.trim() === "") return null;
     const cleaned = raw.replace(",", ".").trim();
     if (!/^\d+(\.\d+)?$/.test(cleaned)) return NaN as unknown as number;
     const val = Number(cleaned);
     if (!Number.isFinite(val)) return NaN as unknown as number;
-    const isHalf = Math.abs(val * 2 - Math.round(val * 2)) < 1e-9;
-    return isHalf ? val : (NaN as unknown as number);
+
+    if (halves) {
+      const isHalf = Math.abs(val * 2 - Math.round(val * 2)) < 1e-9;
+      return isHalf ? val : (NaN as unknown as number);
+    }
+    return Number.isInteger(val) ? val : (NaN as unknown as number);
   };
 
   const setTaskPoints = (task: Task, raw: string) => {
-    const val = normalize(raw);
+    const val = normalizeForTask(raw, task.allowHalfPoints);
     let err: string | null = null;
 
     if (val === null) {
@@ -431,7 +436,9 @@ const Tests: React.FC = () => {
       setTaskErrors((prev) => ({ ...prev, [task.id]: null }));
       return;
     } else if (Number.isNaN(val)) {
-      err = "Niepoprawny format.";
+      err = task.allowHalfPoints
+        ? "Dozwolone wartości co 0.5."
+        : "Dozwolone tylko liczby całkowite.";
     } else if (val < task.minPoints || val > task.maxPoints) {
       err = `Zakres ${task.minPoints}–${task.maxPoints}.`;
     }
@@ -518,7 +525,9 @@ const Tests: React.FC = () => {
         <div className="w-full mx-auto">
           {/* Pasek nagłówka */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
-            <h2 className="text-2xl font-bold text-[#222B45]">Twoje sesje testów</h2>
+            <h2 className="text-2xl font-bold text-[#222B45]">
+              Twoje sesje testów
+            </h2>
             <button
               onClick={() => setShowSessionModal(true)}
               className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
@@ -701,13 +710,13 @@ const Tests: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-3  overflow-y-auto max-h-[53vh]">
+                  <div className="flex flex-col gap-3 overflow-y-auto max-h-[53vh]">
                     {tasks.map((t, idx) => {
                       const err = taskErrors[t.id];
                       return (
                         <div
                           key={t.id}
-                          className="flex items-start md:items-end gap-3 bg-[#f7fafc] rounded-lg px-4 py-3"
+                          className="flex items-center gap-3 bg-[#f7fafc] rounded-lg px-4 py-3"
                         >
                           <div className="min-w-[72px] font-bold mt-1">
                             Zad. {t.order}
@@ -717,17 +726,20 @@ const Tests: React.FC = () => {
                               {t.description}
                             </div>
                             <div className="text-xs text-gray-400">
-                              ({t.minPoints}–{t.maxPoints}pkt) 
+                              ({t.minPoints}–{t.maxPoints} pkt, krok{" "}
+                              {t.allowHalfPoints ? "0.5" : "1"})
                             </div>
                           </div>
                           <div className="w-32">
                             <label className="block text-xs mb-1">Punkty</label>
                             <input
                               type="number"
-                              step="0.5"
+                              step={t.allowHalfPoints ? 0.5 : 1}
                               min={t.minPoints}
                               max={t.maxPoints}
-                              placeholder="np. 3 lub 3,5"
+                              placeholder={
+                                t.allowHalfPoints ? "np. 3 lub 3,5" : "np. 3"
+                              }
                               value={t.points ?? ""}
                               onChange={(e) => setTaskPoints(t, e.target.value)}
                               onKeyDown={(e) => handleKeyDown(e, idx)}
@@ -843,7 +855,7 @@ const Tests: React.FC = () => {
 
             {sessionTab === "load" ? (
               <div className="space-y-3">
-                {/* Tabela jak na innych stronach, z podświetleniem wyboru i SCROLLEM */}
+                {/* Tabela */}
                 <div className="bg-white rounded-xl shadow-md overflow-hidden w-full">
                   <div className="max-h-[55vh] overflow-y-auto">
                     <table className="min-w-full">
@@ -948,7 +960,7 @@ const Tests: React.FC = () => {
                                 {new Date(s.date).toLocaleDateString()}
                               </td>
 
-                              {/* Akcje po prawej (jak w schools.tsx) */}
+                              {/* Akcje */}
                               <td className="pr-6 text-right">
                                 {!isEditing && (
                                   <div className="flex gap-3 justify-end">
@@ -990,7 +1002,7 @@ const Tests: React.FC = () => {
                     </table>
                   </div>
 
-                  {/* Pasek akcji pod tabelą (poza scrollem) */}
+                  {/* Pasek akcji pod tabelą */}
                   <div
                     className="flex items-center justify-between gap-3 p-4 border-t"
                     style={{ borderColor: "#ececec" }}
