@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Sidebar from "../components/Sidebar/Sidebar";
 import axios from "axios";
+import * as XLSX from "xlsx";
 
 // --- Typy (bez kategorii) ---
 type TaskDraft = {
@@ -28,6 +29,14 @@ type TestTemplate = {
 const snapByRule = (v: number, halves: boolean) =>
   halves ? Math.round(v * 2) / 2 : Math.round(v);
 
+const parseBool = (v: any) => {
+  const s = String(v ?? "").trim().toLowerCase();
+  return s === "true" || s === "1" || s === "t" || s === "tak" || s === "y" || s === "yes";
+};
+
+const safeFilename = (name: string) =>
+  name.replace(/[\\/:*?"<>|]/g, "_").slice(0, 120);
+
 const TestTemplates: React.FC = () => {
   // Lista szablonów
   const [templates, setTemplates] = useState<TestTemplate[]>([]);
@@ -53,6 +62,9 @@ const TestTemplates: React.FC = () => {
   const [editTasks, setEditTasks] = useState<TaskDraft[]>([
     { description: "", minPoints: 0, maxPoints: 1, allowHalfPoints: true },
   ]);
+
+  // --- Import XLSX (ref do file input) ---
+  const importFileRef = useRef<HTMLInputElement | null>(null);
 
   // ---------------------------------
   // Pobranie szablonów
@@ -159,8 +171,7 @@ const TestTemplates: React.FC = () => {
       resetAddForm();
       setShowAddForm(false);
       setMessage({ type: "success", text: "Szablon testu został zapisany!" });
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (err: any) {
+    } catch {
       setMessage({ type: "error", text: "Błąd zapisu szablonu!" });
     }
   };
@@ -303,6 +314,171 @@ const TestTemplates: React.FC = () => {
   };
 
   // ---------------------------------
+  // XLSX — EKSPORT POJEDYNCZEGO SZABLONU
+  // ---------------------------------
+  const exportOneTemplateXlsx = (tpl: TestTemplate) => {
+    const rows =
+      tpl.tasks.length === 0
+        ? [
+            {
+              TemplateName: tpl.name,
+              TaskOrder: "",
+              Description: "",
+              MinPoints: "",
+              MaxPoints: "",
+              AllowHalfPoints: "TRUE",
+            },
+          ]
+        : tpl.tasks.map((task, idx) => ({
+            TemplateName: tpl.name,
+            TaskOrder: idx + 1,
+            Description: task.description,
+            MinPoints: task.minPoints,
+            MaxPoints: task.maxPoints,
+            AllowHalfPoints: task.allowHalfPoints ? "TRUE" : "FALSE",
+          }));
+
+    const ws = XLSX.utils.json_to_sheet(rows, {
+      header: [
+        "TemplateName",
+        "TaskOrder",
+        "Description",
+        "MinPoints",
+        "MaxPoints",
+        "AllowHalfPoints",
+      ],
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, `test-template-${safeFilename(tpl.name)}.xlsx`);
+  };
+
+  // ---------------------------------
+  // XLSX — IMPORT SZABLONÓW (walidacja nazw)
+  // ---------------------------------
+
+  const handleImportXlsx: React.ChangeEventHandler<HTMLInputElement> = async (
+    e
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      // grupuj po nazwie szablonu
+      const groups = new Map<
+        string,
+        {
+          order: number;
+          description: string;
+          minPoints: number;
+          maxPoints: number;
+          allowHalfPoints: boolean;
+        }[]
+      >();
+
+      for (const r of rows) {
+        const name = String(
+          r.TemplateName || r["Template Name"] || r.Template || ""
+        ).trim();
+        if (!name) continue;
+
+        const orderRaw = Number(r.TaskOrder || r.Order || r["Task #"] || 0);
+        const description = String(r.Description || r.Task || "").trim();
+        const minRaw = Number(r.MinPoints ?? r.Min ?? 0);
+        const maxRaw = Number(r.MaxPoints ?? r.Max ?? 1);
+        const allowHalfPoints = parseBool(r.AllowHalfPoints ?? r.Halves ?? true);
+
+        const halves = !!allowHalfPoints;
+        // sane defaults + zaokrąglenie do kroku
+        const minPoints = snapByRule(Number.isFinite(minRaw) ? minRaw : 0, halves);
+        const maxPoints = snapByRule(
+          Number.isFinite(maxRaw) ? Math.max(maxRaw, minPoints) : Math.max(1, minPoints),
+          halves
+        );
+
+        const arr = groups.get(name) ?? [];
+        arr.push({
+          order:
+            Number.isFinite(orderRaw) && orderRaw > 0 ? orderRaw : arr.length + 1,
+          description,
+          minPoints,
+          maxPoints,
+          allowHalfPoints: halves,
+        });
+        groups.set(name, arr);
+      }
+
+      const token = localStorage.getItem("token");
+      const existingNames = new Set(
+        templates.map((t) => (t.name || "").trim().toLowerCase())
+      );
+
+      let ok = 0;
+      let skippedDuplicates = 0;
+      let fail = 0;
+
+      for (const [tplName, list] of groups) {
+        const nameKey = tplName.trim().toLowerCase();
+        // twarda walidacja: nazwa już istnieje -> pomijamy cały szablon
+        if (!tplName || existingNames.has(nameKey)) {
+          skippedDuplicates++;
+          continue;
+        }
+
+        try {
+          // utwórz szablon
+          const res = await axios.post(
+            "/test-templates",
+            { name: tplName },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          const templateId = res.data.id;
+
+          // utwórz zadania
+          const tasksSorted = [...list].sort((a, b) => a.order - b.order);
+          for (let i = 0; i < tasksSorted.length; i++) {
+            const t = tasksSorted[i];
+            await axios.post(
+              `/test-templates/${templateId}/tasks`,
+              {
+                description: t.description,
+                order: i + 1,
+                minPoints: t.minPoints,
+                maxPoints: Math.max(t.maxPoints, t.minPoints),
+                allowHalfPoints: t.allowHalfPoints,
+              },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+          }
+
+          ok++;
+          existingNames.add(nameKey);
+        } catch {
+          fail++;
+        }
+      }
+
+      await fetchTemplates();
+      setMessage({
+        type: (fail || skippedDuplicates) ? "error" : "success",
+        text:
+          `Zaimportowano ${ok} szablon(y).` +
+          (skippedDuplicates ? ` Nazwa szablonu już istnieje.`: "") +
+          (fail ? ` Błędy: ${fail}.` : ""),
+      });
+    } catch {
+      setMessage({ type: "error", text: "Nie udało się zaimportować pliku." });
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  // ---------------------------------
   // Helpers UI (dodawanie/edycja zadań)
   // ---------------------------------
   const addAddTask = () =>
@@ -341,21 +517,37 @@ const TestTemplates: React.FC = () => {
       <Sidebar />
       <main className="flex-1 md:ml-[230px] px-4 pt-10 pb-8">
         <div className="w-full max-w-100%">
-          {/* Nagłówek + akcja */}
+          {/* Nagłówek + akcje (import globalny, eksport pojedynczy jest per-karta) */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
             <h2 className="text-2xl font-bold text-[#222B45]">
               Twoje szablony testów
             </h2>
-            <button
-              className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
-              onClick={() => {
-                setShowAddForm(true);
-                setMessage(null);
-                resetAddForm();
-              }}
-            >
-              + Dodaj nowy szablon
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
+                onClick={() => importFileRef.current?.click()}
+                type="button"
+              >
+                Importuj szablon z Excela
+              </button>
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={handleImportXlsx}
+              />
+              <button
+                className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
+                onClick={() => {
+                  setShowAddForm(true);
+                  setMessage(null);
+                  resetAddForm();
+                }}
+              >
+                + Dodaj nowy szablon
+              </button>
+            </div>
           </div>
 
           {/* Komunikaty */}
@@ -569,44 +761,51 @@ const TestTemplates: React.FC = () => {
                   key={template.id}
                   className="bg-white rounded-xl shadow p-5 flex flex-col gap-3"
                 >
-                  {/* tekst na całą szerokość */}
-                  <div className="flex-1">
-                    <span className="font-bold text-lg">{template.name}</span>
-                    <div className="mt-2">
-                      {template.tasks.length === 0 ? (
-                        <div className="text-gray-400 text-sm">Brak zadań</div>
-                      ) : (
-                        template.tasks.map((task, idx) => (
-                          <div key={task.id || idx} className="text-sm my-1">
-                            <span className="font-semibold">
-                              Zadanie {idx + 1}.
-                            </span>{" "}
-                            {task.description}{" "}
-                            <span className="text-xs text-gray-400">
-                              ({task.minPoints}-{task.maxPoints} pkt,{" "}
-                              {task.allowHalfPoints
-                                ? "połówki: TAK"
-                                : "połówki: NIE"}
-                              )
-                            </span>
-                          </div>
-                        ))
-                      )}
+                    <div className="flex-1">
+                      <span className="font-bold text-lg">{template.name}</span>
+                      <div className="mt-2">
+                        {template.tasks.length === 0 ? (
+                          <div className="text-gray-400 text-sm">Brak zadań</div>
+                        ) : (
+                          template.tasks.map((task, idx) => (
+                            <div key={task.id || idx} className="text-sm my-1">
+                              <span className="font-semibold">
+                                Zadanie {idx + 1}.
+                              </span>{" "}
+                              {task.description}{" "}
+                              <span className="text-xs text-gray-400">
+                                ({task.minPoints}-{task.maxPoints} pkt,{" "}
+                                {task.allowHalfPoints
+                                  ? "połówki: TAK"
+                                  : "połówki: NIE"}
+                                )
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex gap-3 justify-end self-end">
-                    <button
-                      className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
-                      onClick={() => openEdit(template)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
-                      onClick={() => handleDeleteTemplate(template.id)}
-                    >
-                      Delete
-                    </button>
+                    <div className="flex gap-3 justify-end self-end">
+                      <button
+                        className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
+                        onClick={() => openEdit(template)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
+                        onClick={() => handleDeleteTemplate(template.id)}
+                      >
+                        Delete
+                      </button>
+                      <button
+                        className="hover:bg-gray-100 text-gray-600 font-semibold px-3 py-1.5 rounded-lg transition"
+                        onClick={() => exportOneTemplateXlsx(template)}
+                        type="button"
+                        title="Eksportuj ten szablon"
+                      >
+                        Eksportuj
+                      </button>
                   </div>
                 </div>
               ))}

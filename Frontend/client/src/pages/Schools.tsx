@@ -1,22 +1,49 @@
-import React, { useEffect, useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Sidebar from "../components/Sidebar/Sidebar";
 import { Link } from "react-router-dom";
+import * as XLSX from "xlsx";
 
-// Typ szkoły
-type School = {
+// Typy
+type School = { id: number; name: string; ownerId: number };
+type SchoolClass = { id: number; name: string; schoolId: number };
+type Student = {
   id: number;
-  name: string;
-  ownerId: number;
+  firstName: string;
+  lastName: string;
+  gender: string;
+  order: number;
+  classId: number;
+};
+
+type Msg = { type: "info" | "error" | "success"; text: string };
+
+const safeFilename = (name: string) =>
+  name.replace(/[\\/:*?"<>|]/g, "_").slice(0, 120);
+
+const getTokenHeader = () => {
+  const token = localStorage.getItem("token");
+  return { Authorization: `Bearer ${token}` };
+};
+
+// --- Pomocnicze parsowanie kolumn ---
+const readStr = (v: any) => String(v ?? "").trim();
+const readNum = (v: any, fallback = 0) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
 };
 
 const Schools: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [name, setName] = useState("");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<Msg | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+
+  // input do importu
+  const importSchoolRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     fetchSchools();
@@ -24,75 +51,103 @@ const Schools: React.FC = () => {
 
   // Pobierz szkoły
   const fetchSchools = async () => {
-    const token = localStorage.getItem("token");
     try {
       const res = await axios.get<School[]>("http://localhost:4000/schools", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getTokenHeader(),
       });
       setSchools(res.data);
     } catch {
-      setMessage(
-        "Nie udało się pobrać szkół (upewnij się, że jesteś zalogowany/a)"
-      );
+      setMessage({
+        type: "error",
+        text: "Nie udało się pobrać szkół (upewnij się, że jesteś zalogowany/a).",
+      });
     }
   };
 
-  // Dodaj szkołę
+  // Dodaj szkołę (proste dodanie z widoku)
   const handleAddSchool = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage("");
-    const token = localStorage.getItem("token");
+    setMessage(null);
+
+    const exists = schools.some(
+      (s) => (s.name || "").trim().toLowerCase() === name.trim().toLowerCase()
+    );
+    if (exists) {
+      setMessage({
+        type: "error",
+        text: "Szkoła o takiej nazwie już istnieje.",
+      });
+      return;
+    }
+
     try {
       const res = await axios.post<School>(
         "http://localhost:4000/schools",
         { name },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: getTokenHeader() }
       );
       setSchools([...schools, res.data]);
       setName("");
       setShowForm(false);
-      setMessage("Szkoła dodana!");
+      setMessage({ type: "success", text: "Szkoła dodana!" });
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
-        setMessage(err.response?.data?.error || "Błąd dodawania szkoły");
+        setMessage({
+          type: "error",
+          text: err.response?.data?.error || "Błąd dodawania szkoły",
+        });
       } else {
-        setMessage("Błąd dodawania szkoły");
+        setMessage({ type: "error", text: "Błąd dodawania szkoły" });
       }
     }
   };
 
-  // Rozpocznij edycję
+  // Edycja
   const handleStartEdit = (school: School) => {
     setEditId(school.id);
     setEditName(school.name);
   };
 
-  // Zapisz edycję
   const handleSaveEdit = async (id: number) => {
     if (!editName.trim()) return;
-    const token = localStorage.getItem("token");
+
+    const exists = schools.some(
+      (s) =>
+        s.id !== id &&
+        (s.name || "").trim().toLowerCase() === editName.trim().toLowerCase()
+    );
+    if (exists) {
+      setMessage({
+        type: "error",
+        text: "Szkoła o takiej nazwie już istnieje.",
+      });
+      return;
+    }
+
     try {
       await axios.put(
         `http://localhost:4000/schools/${id}`,
         { name: editName },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: getTokenHeader() }
       );
       setSchools(
         schools.map((s) => (s.id === id ? { ...s, name: editName } : s))
       );
       setEditId(null);
       setEditName("");
-      setMessage("Nazwa szkoły została zmieniona.");
+      setMessage({ type: "success", text: "Nazwa szkoły została zmieniona." });
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
-        setMessage(err.response?.data?.error || "Błąd edycji szkoły");
+        setMessage({
+          type: "error",
+          text: err.response?.data?.error || "Błąd edycji szkoły",
+        });
       } else {
-        setMessage("Błąd edycji szkoły");
+        setMessage({ type: "error", text: "Błąd edycji szkoły" });
       }
     }
   };
 
-  // Anuluj edycję
   const handleCancelEdit = () => {
     setEditId(null);
     setEditName("");
@@ -101,37 +156,311 @@ const Schools: React.FC = () => {
   // Usuń szkołę
   const handleDeleteSchool = async (id: number) => {
     if (!window.confirm("Na pewno usunąć szkołę?")) return;
-    const token = localStorage.getItem("token");
     try {
       await axios.delete(`http://localhost:4000/schools/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getTokenHeader(),
       });
       setSchools(schools.filter((s) => s.id !== id));
-      setMessage("Szkoła została usunięta.");
+      setMessage({ type: "success", text: "Szkoła została usunięta." });
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
-        setMessage(err.response?.data?.error || "Błąd usuwania szkoły");
+        setMessage({
+          type: "error",
+          text: err.response?.data?.error || "Błąd usuwania szkoły",
+        });
       } else {
-        setMessage("Błąd usuwania szkoły");
+        setMessage({ type: "error", text: "Błąd usuwania szkoły" });
       }
     }
   };
+
+  // =========================
+  //  EKSPORT JEDNEJ SZKOŁY
+  // =========================
+  const exportOneSchoolXlsx = async (school: School) => {
+    setMessage(null);
+    try {
+      // 1) Klasy
+      const classesRes = await axios.get<SchoolClass[]>(
+        `http://localhost:4000/schools/${school.id}/classes`,
+        { headers: getTokenHeader() }
+      );
+      const classes = classesRes.data || [];
+
+      // 2) Uczniowie per klasa
+      const allStudentsRows: Array<{
+        ClassName: string;
+        FirstName: string;
+        LastName: string;
+        Gender: string;
+        Order: number | "";
+      }> = [];
+
+      for (const c of classes) {
+        const studentsRes = await axios.get<Student[]>(
+          `http://localhost:4000/schools/${school.id}/classes/${c.id}/students`,
+          { headers: getTokenHeader() }
+        );
+        const stus = studentsRes.data || [];
+        for (const s of stus) {
+          allStudentsRows.push({
+            ClassName: c.name,
+            FirstName: s.firstName ?? "",
+            LastName: s.lastName ?? "",
+            Gender: s.gender ?? "",
+            Order:
+              typeof s.order === "number" && Number.isFinite(s.order)
+                ? s.order
+                : "",
+          });
+        }
+      }
+
+      // 3) Arkusze
+      const wsSchool = XLSX.utils.json_to_sheet([{ Name: school.name }], {
+        header: ["Name"],
+      });
+      const wsClasses = XLSX.utils.json_to_sheet(
+        classes.length
+          ? classes.map((c) => ({ ClassName: c.name }))
+          : [{ ClassName: "" }],
+        { header: ["ClassName"] }
+      );
+      const wsStudents = XLSX.utils.json_to_sheet(
+        allStudentsRows.length
+          ? allStudentsRows
+          : [
+              {
+                ClassName: "",
+                FirstName: "",
+                LastName: "",
+                Gender: "",
+                Order: "",
+              },
+            ],
+        { header: ["ClassName", "FirstName", "LastName", "Gender", "Order"] }
+      );
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, wsSchool, "School");
+      XLSX.utils.book_append_sheet(wb, wsClasses, "Classes");
+      XLSX.utils.book_append_sheet(wb, wsStudents, "Students");
+
+      XLSX.writeFile(wb, `school-${safeFilename(school.name)}.xlsx`);
+      setMessage({ type: "success", text: "Eksport zakończony." });
+    } catch {
+      setMessage({
+        type: "error",
+        text: "Nie udało się wyeksportować szkoły.",
+      });
+    }
+  };
+
+  // =========================
+  //  IMPORT SZKOŁY (STRUKTURA)
+  // =========================
+  const importSchoolsClick = () => importSchoolRef.current?.click();
+
+  const importSchoolsXlsx: React.ChangeEventHandler<HTMLInputElement> = async (
+    e
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf);
+
+      const wsSchool = wb.Sheets["School"];
+      if (!wsSchool) {
+        setMessage({
+          type: "error",
+          text: 'Brak arkusza "School" — nie można zaimportować.',
+        });
+        e.target.value = "";
+        return;
+      }
+      const schoolRows: any[] = XLSX.utils.sheet_to_json(wsSchool, {
+        defval: "",
+      });
+      if (!schoolRows.length) {
+        setMessage({ type: "error", text: 'Arkusz "School" jest pusty.' });
+        e.target.value = "";
+        return;
+      }
+
+      const importedSchoolName = readStr(
+        schoolRows[0].Name ||
+          schoolRows[0]["School Name"] ||
+          schoolRows[0]["Nazwa"]
+      );
+      if (!importedSchoolName) {
+        setMessage({
+          type: "error",
+          text: 'W arkuszu "School" pole "Name" jest wymagane.',
+        });
+        e.target.value = "";
+        return;
+      }
+
+      // Walidacja duplikatu NAZWY szkoły
+      const exists = schools.some(
+        (s) =>
+          (s.name || "").trim().toLowerCase() ===
+          importedSchoolName.trim().toLowerCase()
+      );
+      if (exists) {
+        setMessage({
+          type: "error",
+          text: `Szkoła "${importedSchoolName}" już istnieje — import pominięty.`,
+        });
+        e.target.value = "";
+        return;
+      }
+
+      // Wczytaj arkusze (opcjonalne)
+      const wsClasses = wb.Sheets["Classes"];
+      const wsStudents = wb.Sheets["Students"];
+
+      const classRows: any[] = wsClasses
+        ? XLSX.utils.sheet_to_json(wsClasses, { defval: "" })
+        : [];
+      const studentRows: any[] = wsStudents
+        ? XLSX.utils.sheet_to_json(wsStudents, { defval: "" })
+        : [];
+
+      // 1) Utwórz szkołę
+      const createSchoolRes = await axios.post<School>(
+        "http://localhost:4000/schools",
+        { name: importedSchoolName },
+        { headers: getTokenHeader() }
+      );
+      const schoolId = createSchoolRes.data.id;
+
+      // 2) Utwórz klasy (zmapuj nazwa -> id)
+      const classNameToId = new Map<string, number>();
+
+      // a) klasy z arkusza "Classes"
+      for (const r of classRows) {
+        const cname = readStr(r.ClassName || r["Class Name"] || r["Klasa"]);
+        if (!cname) continue;
+        if (classNameToId.has(cname.toLowerCase())) continue; // duplikat w pliku
+
+        const cRes = await axios.post<SchoolClass>(
+          `http://localhost:4000/schools/${schoolId}/classes`,
+          { name: cname },
+          { headers: getTokenHeader() }
+        );
+        classNameToId.set(cname.toLowerCase(), cRes.data.id);
+      }
+
+      // helper: zapewnij klasę przy potrzebie
+      const ensureClass = async (cname: string) => {
+        const key = cname.toLowerCase();
+        if (classNameToId.has(key)) return classNameToId.get(key)!;
+        // nie było na liście klas -> załóż nową
+        const cRes = await axios.post<SchoolClass>(
+          `http://localhost:4000/schools/${schoolId}/classes`,
+          { name: cname },
+          { headers: getTokenHeader() }
+        );
+        classNameToId.set(key, cRes.data.id);
+        return cRes.data.id;
+      };
+
+      // 3) Uczniowie
+      let createdStudents = 0;
+      for (const r of studentRows) {
+        const cname = readStr(r.ClassName || r["Class Name"] || r["Klasa"]);
+        const firstName = readStr(r.FirstName || r["First Name"] || r["Imię"]);
+        const lastName = readStr(r.LastName || r["Last Name"] || r["Nazwisko"]);
+        const gender = readStr(r.Gender || r["Płeć"]);
+        const order = readNum(r.Order ?? r["Kolejność"], 0);
+
+        // pomiń kompletnie puste rzędy
+        if (!cname && !firstName && !lastName && !gender && !order) continue;
+        if (!cname) continue; // bez klasy nie ma gdzie wstawić
+        if (!firstName && !lastName) continue; // wymagane min.: imię lub nazwisko
+
+        const classId = await ensureClass(cname);
+        try {
+          await axios.post(
+            `http://localhost:4000/schools/${schoolId}/classes/${classId}/students`,
+            { firstName, lastName, gender, order },
+            { headers: getTokenHeader() }
+          );
+          createdStudents++;
+        } catch {
+          // Możesz tu dopisać bardziej szczegółowy log dla błędnych rekordów
+        }
+      }
+
+      await fetchSchools();
+      setMessage({
+        type: "success",
+        text:
+          `Zaimportowano szkołę "${importedSchoolName}". ` +
+          `Klasy: ${classNameToId.size}` +
+          (studentRows.length
+            ? `, uczniowie (utworzono): ${createdStudents}.`
+            : "."),
+      });
+    } catch {
+      setMessage({ type: "error", text: "Nie udało się zaimportować pliku." });
+    } finally {
+      e.target.value = "";
+    }
+  };
+
   return (
     <div className="min-h-screen flex bg-[#f7fafc]">
       <Sidebar />
       <main className="flex-1 flex flex-col items-center px-4 pt-10 pb-8 sm:px-8 md:ml-[230px]">
         <div className="w-full max-w-100% mx-auto">
-          {/* Header + Dodaj szkołę */}
+          {/* Header + Akcje (import, dodanie) */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
             <h2 className="text-2xl font-bold text-[#222B45]">Schools Table</h2>
-            <button
-              onClick={() => setShowForm(true)}
-              className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
-            >
-              + Add School
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={importSchoolsClick}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
+                type="button"
+                title='Importuje jedną szkołę z pliku posiadającego arkusze: "School", "Classes", "Students"'
+              >
+                Importuj szkołę z Excela
+              </button>
+              <input
+                ref={importSchoolRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={importSchoolsXlsx}
+              />
+              <button
+                onClick={() => setShowForm(true)}
+                className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
+              >
+                + Add School
+              </button>
+            </div>
           </div>
-          {/* Form dodawania */}
+
+          {/* Komunikaty */}
+          {message && (
+            <div
+              className={`mb-4 text-center font-medium text-sm rounded-lg py-2 px-4 ${
+                message.type === "error"
+                  ? "text-red-600 bg-red-50"
+                  : message.type === "success"
+                  ? "text-teal-600 bg-teal-50"
+                  : "text-gray-600 bg-gray-100"
+              }`}
+            >
+              {message.text}
+            </div>
+          )}
+
+          {/* Formularz dodawania */}
           {showForm && (
             <form
               onSubmit={handleAddSchool}
@@ -162,13 +491,8 @@ const Schools: React.FC = () => {
               </button>
             </form>
           )}
-          {/* Info */}
-          {message && (
-            <div className="mb-4 text-center font-medium text-sm text-teal-600 bg-teal-50 rounded-lg py-2 px-4">
-              {message}
-            </div>
-          )}
-          {/* Karta z tabelą */}
+
+          {/* Tabela szkół */}
           <div className="bg-white rounded-xl shadow-md overflow-x-auto w-full">
             <table className="min-w-full">
               <thead>
@@ -176,7 +500,7 @@ const Schools: React.FC = () => {
                   <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6">
                     SCHOOL NAME
                   </th>
-                  <th className="w-40"></th>
+                  <th className="w-64"></th>
                 </tr>
               </thead>
               <tbody>
@@ -191,7 +515,6 @@ const Schools: React.FC = () => {
                   >
                     <td className="flex items-center gap-4 py-5 pl-6 min-w-[250px]">
                       {editId === school.id ? (
-                        // TRYB EDYCJI
                         <div className="w-full -my-1">
                           <input
                             className="border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:border-teal-400 w-full"
@@ -229,18 +552,26 @@ const Schools: React.FC = () => {
                           </button>
                         </div>
                       ) : (
-                        <div className="flex gap-3 justify-end">
+                        <div className="flex gap-2 justify-end">
                           <button
                             className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
                             onClick={() => handleStartEdit(school)}
                           >
-                            Edit
+                            Edytuj
                           </button>
                           <button
                             className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
                             onClick={() => handleDeleteSchool(school.id)}
                           >
-                            Delete
+                            Usuń
+                          </button>
+                          <button
+                            className="hover:bg-gray-100 text-gray-600 font-semibold px-3 py-1.5 rounded-lg transition"
+                            onClick={() => exportOneSchoolXlsx(school)}
+                            type="button"
+                            title="Eksportuj tę szkołę wraz z klasami i uczniami"
+                          >
+                            Eksportuj
                           </button>
                         </div>
                       )}
