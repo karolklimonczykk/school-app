@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Sidebar from "../components/Sidebar/Sidebar";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useToast } from "../components/Toast";
 
 // Typy
 type School = { id: number; name: string };
@@ -28,10 +29,7 @@ const Students: React.FC = () => {
     gender: "",
   });
 
-  const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState<"" | "error" | "success">("");
   const [loading, setLoading] = useState(false);
-
   const [editId, setEditId] = useState<number | null>(null);
   const [editStudent, setEditStudent] = useState({
     firstName: "",
@@ -42,6 +40,11 @@ const Students: React.FC = () => {
 
   const location = useLocation();
   const navigate = useNavigate();
+  const { push } = useToast();
+
+  const tokenHeader = () => ({
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  });
 
   // 1. Pobierz szkoły na start
   useEffect(() => {
@@ -84,12 +87,9 @@ const Students: React.FC = () => {
   useEffect(() => {
     if (selectedSchoolId && !selectedClassId) {
       setLoading(true);
-      setMessage("");
-      setMessageType("");
-      const token = localStorage.getItem("token");
       axios
         .get<Student[]>("http://localhost:4000/students", {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: tokenHeader(),
         })
         .then((res) => {
           const filtered = res.data.filter(
@@ -101,8 +101,7 @@ const Students: React.FC = () => {
           setStudents(filtered);
         })
         .catch(() => {
-          setMessageType("error");
-          setMessage("Błąd pobierania uczniów!");
+          push({ type: "error", message: "Błąd pobierania uczniów!" });
           setStudents([]);
         })
         .finally(() => setLoading(false));
@@ -111,6 +110,7 @@ const Students: React.FC = () => {
     } else if (!selectedSchoolId && !selectedClassId && schools.length > 0) {
       fetchAllStudents();
     } else setStudents([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSchoolId, selectedClassId, schools]);
 
   // Zamykanie formularza po wyczyszczeniu filtrów
@@ -123,47 +123,39 @@ const Students: React.FC = () => {
 
   // --- API CALLS ---
   const fetchSchools = async () => {
-    const token = localStorage.getItem("token");
     try {
       const res = await axios.get<School[]>("http://localhost:4000/schools", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: tokenHeader(),
       });
       setSchools(res.data);
     } catch {
-      setMessageType("error");
-      setMessage("Błąd pobierania szkół!");
+      push({ type: "error", message: "Błąd pobierania szkół!" });
     }
   };
 
   const fetchClasses = async (schoolId: number | "") => {
     if (!schoolId) return;
-    const token = localStorage.getItem("token");
     try {
       const res = await axios.get<SchoolClass[]>(
         `http://localhost:4000/schools/${schoolId}/classes`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: tokenHeader() }
       );
       setClasses(res.data);
     } catch {
-      setMessageType("error");
-      setMessage("Błąd pobierania klas!");
+      push({ type: "error", message: "Błąd pobierania klas!" });
       setClasses([]);
     }
   };
 
   const fetchAllStudents = async () => {
     setLoading(true);
-    setMessage("");
-    setMessageType("");
-    const token = localStorage.getItem("token");
     try {
       const res = await axios.get<Student[]>("http://localhost:4000/students", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: tokenHeader(),
       });
       setStudents(res.data);
     } catch {
-      setMessageType("error");
-      setMessage("Błąd pobierania uczniów!");
+      push({ type: "error", message: "Błąd pobierania uczniów!" });
       setStudents([]);
     } finally {
       setLoading(false);
@@ -173,18 +165,14 @@ const Students: React.FC = () => {
   const fetchStudents = async (schoolId: number | "", classId: number | "") => {
     if (!schoolId || !classId) return;
     setLoading(true);
-    setMessage("");
-    setMessageType("");
-    const token = localStorage.getItem("token");
     try {
       const res = await axios.get<Student[]>(
         `http://localhost:4000/schools/${schoolId}/classes/${classId}/students`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: tokenHeader() }
       );
       setStudents(res.data);
     } catch {
-      setMessageType("error");
-      setMessage("Błąd pobierania uczniów!");
+      push({ type: "error", message: "Błąd pobierania uczniów!" });
       setStudents([]);
     } finally {
       setLoading(false);
@@ -195,36 +183,30 @@ const Students: React.FC = () => {
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSchoolId) {
-      setMessageType("error");
-      setMessage("Wybierz szkołę");
+      push({ type: "error", message: "Wybierz szkołę!" });
       return;
     }
     if (!selectedClassId) {
-      setMessageType("error");
-      setMessage("Wybierz klasę");
+      push({ type: "error", message: "Wybierz klasę!" });
       return;
     }
-    setMessage("");
-    setMessageType("");
-    const token = localStorage.getItem("token");
     try {
       const res = await axios.post<Student>(
         `http://localhost:4000/schools/${selectedSchoolId}/classes/${selectedClassId}/students`,
         newStudent,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: tokenHeader() }
       );
       setStudents([...students, res.data]);
       setNewStudent({ firstName: "", lastName: "", gender: "" });
       setShowAddInput(false);
-      setMessageType("success");
-      setMessage("Uczeń dodany!");
+      push({ type: "success", message: "Uczeń dodany!" });
     } catch (err: unknown) {
-      setMessageType("error");
-      if (axios.isAxiosError(err)) {
-        setMessage(err.response?.data?.error || "Błąd dodawania ucznia");
-      } else {
-        setMessage("Błąd dodawania ucznia");
-      }
+      push({
+        type: "error",
+        message: axios.isAxiosError(err)
+          ? err.response?.data?.error || "Błąd dodawania ucznia"
+          : "Błąd dodawania ucznia",
+      });
     }
   };
 
@@ -236,39 +218,36 @@ const Students: React.FC = () => {
       gender: student.gender,
     });
   };
+
   const handleSaveEdit = async (
     studentId: number,
     schoolId: number,
     classId: number
   ) => {
-    const token = localStorage.getItem("token");
     try {
       const res = await axios.put(
         `http://localhost:4000/schools/${schoolId}/classes/${classId}/students/${studentId}`,
         editStudent,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: tokenHeader() }
       );
 
-      // KLUCZ: nie kasuj s.class – zachowaj ją po update
+      // Zachowaj relację 'class' (żeby nie znikła w tabeli)
       setStudents((prev) =>
         prev.map((s) =>
-          s.id === studentId
-            ? { ...s, ...res.data, class: s.class } // <- zachowujemy relację
-            : s
+          s.id === studentId ? { ...s, ...res.data, class: s.class } : s
         )
       );
 
       setEditId(null);
       setEditStudent({ firstName: "", lastName: "", gender: "M" });
-      setMessageType("success");
-      setMessage("Uczeń zaktualizowany!");
+      push({ type: "success", message: "Uczeń zaktualizowany!" });
     } catch (err: unknown) {
-      setMessageType("error");
-      setMessage(
-        axios.isAxiosError(err)
+      push({
+        type: "error",
+        message: axios.isAxiosError(err)
           ? err.response?.data?.error || "Błąd edycji ucznia"
-          : "Błąd edycji ucznia"
-      );
+          : "Błąd edycji ucznia",
+      });
     }
   };
 
@@ -283,21 +262,20 @@ const Students: React.FC = () => {
     classId: number
   ) => {
     if (!window.confirm("Na pewno usunąć ucznia?")) return;
-    setMessage("");
-    const token = localStorage.getItem("token");
     try {
       await axios.delete(
         `http://localhost:4000/schools/${schoolId}/classes/${classId}/students/${studentId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: tokenHeader() }
       );
       setStudents(students.filter((s) => s.id !== studentId));
-      setMessage("Uczeń usunięty!");
+      push({ type: "success", message: "Uczeń usunięty!" });
     } catch (err: unknown) {
-      setMessage(
-        axios.isAxiosError(err)
+      push({
+        type: "error",
+        message: axios.isAxiosError(err)
           ? err.response?.data?.error || "Błąd usuwania ucznia"
-          : "Błąd usuwania ucznia"
-      );
+          : "Błąd usuwania ucznia",
+      });
     }
   };
 
@@ -311,9 +289,8 @@ const Students: React.FC = () => {
     setShowAddInput(false);
     setEditId(null);
     setEditStudent({ firstName: "", lastName: "", gender: "M" });
-    setMessage("");
-    setMessageType("");
   };
+
   const handleFilterClass = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     setSelectedClassId(value ? Number(value) : "");
@@ -324,8 +301,6 @@ const Students: React.FC = () => {
     setShowAddInput(false);
     setEditId(null);
     setEditStudent({ firstName: "", lastName: "", gender: "M" });
-    setMessage("");
-    setMessageType("");
   };
 
   const currentSchoolName = selectedSchoolId
@@ -407,21 +382,17 @@ const Students: React.FC = () => {
                 </span>
               </div>
 
-              {/* PRZYCISK DODAWANIA – nie wyłączamy; pokazujemy błąd jeśli brak wyboru */}
+              {/* PRZYCISK DODAWANIA */}
               <button
                 onClick={() => {
                   if (!selectedSchoolId) {
-                    setMessageType("error");
-                    setMessage("Wybierz szkołę!");
+                    push({ type: "error", message: "Wybierz szkołę!" });
                     return;
                   }
                   if (!selectedClassId) {
-                    setMessageType("error");
-                    setMessage("Wybierz klasę!");
+                    push({ type: "error", message: "Wybierz klasę!" });
                     return;
                   }
-                  setMessage("");
-                  setMessageType("");
                   setShowAddInput(true);
                 }}
                 className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
@@ -431,26 +402,13 @@ const Students: React.FC = () => {
             </div>
           </div>
 
-          {/* Komunikaty */}
-          {message && (
-            <div
-              className={`mb-4 text-center font-medium text-sm rounded-lg py-2 px-4 ${
-                messageType === "error"
-                  ? "text-red-600 bg-red-50"
-                  : "text-teal-600 bg-teal-50"
-              }`}
-            >
-              {message}
-            </div>
-          )}
-
           {/* Dodawanie ucznia */}
           {showAddInput && selectedSchoolId && selectedClassId && (
             <form
               onSubmit={handleAddStudent}
               className="mb-7 w-full flex flex-col gap-2 md:flex-row md:items-end"
             >
-              {/* Imię – full width na mobile, 1/4 od md */}
+              {/* Imię */}
               <div className="w-full md:basis-1/4">
                 <input
                   type="text"
@@ -465,7 +423,7 @@ const Students: React.FC = () => {
                 />
               </div>
 
-              {/* Nazwisko – full width na mobile, 1/2 od md */}
+              {/* Nazwisko */}
               <div className="w-full md:basis-1/2">
                 <input
                   type="text"
@@ -479,7 +437,7 @@ const Students: React.FC = () => {
                 />
               </div>
 
-              {/* Płeć – full width na mobile, 1/4 od md; TE SAME style co inputy */}
+              {/* Płeć */}
               <div className="w-full md:basis-1/4 relative">
                 <select
                   value={newStudent.gender}
@@ -510,7 +468,7 @@ const Students: React.FC = () => {
                 </span>
               </div>
 
-              {/* Akcje – zostawiamy obok na md+, a na mobile pod spodem */}
+              {/* Akcje */}
               <div className="flex gap-2 md:ml-2">
                 <button
                   type="submit"

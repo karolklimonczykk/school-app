@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Sidebar from "../components/Sidebar/Sidebar";
 import axios from "axios";
 import * as XLSX from "xlsx";
+import { useToast } from "../components/Toast";
 
 // --- Typy (bez kategorii) ---
 type TaskDraft = {
@@ -38,15 +39,11 @@ const safeFilename = (name: string) =>
   name.replace(/[\\/:*?"<>|]/g, "_").slice(0, 120);
 
 const TestTemplates: React.FC = () => {
+  const { push } = useToast();
+
   // Lista szablonów
   const [templates, setTemplates] = useState<TestTemplate[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Komunikaty
-  const [message, setMessage] = useState<{
-    type: "info" | "error" | "success";
-    text: string;
-  } | null>(null);
 
   // --- Dodawanie (blok na stronie) ---
   const [showAddForm, setShowAddForm] = useState(false);
@@ -83,7 +80,7 @@ const TestTemplates: React.FC = () => {
       setTemplates(Array.isArray(res.data) ? res.data : []);
     } catch {
       setTemplates([]);
-      setMessage({ type: "error", text: "Błąd pobierania szablonów." });
+      push({ type: "error", message: "Błąd pobierania szablonów." });
     } finally {
       setLoading(false);
     }
@@ -128,10 +125,7 @@ const TestTemplates: React.FC = () => {
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (duplicateAddName) {
-      setMessage({
-        type: "error",
-        text: "Szablon o takiej nazwie już istnieje.",
-      });
+      push({ type: "error", message: "Szablon o takiej nazwie już istnieje." });
       return;
     }
     const token = localStorage.getItem("token");
@@ -170,9 +164,9 @@ const TestTemplates: React.FC = () => {
       // 4) Sprzątamy
       resetAddForm();
       setShowAddForm(false);
-      setMessage({ type: "success", text: "Szablon testu został zapisany!" });
+      push({ type: "success", message: "Szablon testu został zapisany!" });
     } catch {
-      setMessage({ type: "error", text: "Błąd zapisu szablonu!" });
+      push({ type: "error", message: "Błąd zapisu szablonu!" });
     }
   };
 
@@ -210,10 +204,7 @@ const TestTemplates: React.FC = () => {
     if (!editingId) return;
 
     if (isDuplicateRename(editingId, editName)) {
-      setMessage({
-        type: "error",
-        text: "Szablon o takiej nazwie już istnieje.",
-      });
+      push({ type: "error", message: "Szablon o takiej nazwie już istnieje." });
       return;
     }
 
@@ -283,11 +274,11 @@ const TestTemplates: React.FC = () => {
       // 4) Zamknij modal
       setEditOpen(false);
       resetEditForm();
-      setMessage({ type: "success", text: "Zapisano zmiany w szablonie." });
+      push({ type: "success", message: "Zapisano zmiany w szablonie." });
     } catch (err: any) {
-      setMessage({
+      push({
         type: "error",
-        text: err?.response?.data?.error || "Błąd zapisu zmian szablonu!",
+        message: err?.response?.data?.error || "Błąd zapisu zmian szablonu!",
       });
     }
   };
@@ -297,18 +288,18 @@ const TestTemplates: React.FC = () => {
   // ---------------------------------
   const handleDeleteTemplate = async (id: number) => {
     if (!window.confirm("Na pewno usunąć szablon?")) return;
-    setMessage(null);
     const token = localStorage.getItem("token");
     try {
       await axios.delete(`/test-templates/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setTemplates((prev) => prev.filter((t) => t.id !== id));
-      setMessage({ type: "success", text: "Szablon został usunięty." });
+      push({ type: "success", message: "Szablon został usunięty." });
     } catch {
-      setMessage({
+      push({
         type: "error",
-        text: "Usuń sesje testów powiązanych z tym szablonem, aby móc usunąć szablon.",
+        message:
+          "Usuń sesje testów powiązanych z tym szablonem, aby móc usunąć szablon.",
       });
     }
   };
@@ -351,12 +342,12 @@ const TestTemplates: React.FC = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template");
     XLSX.writeFile(wb, `test-template-${safeFilename(tpl.name)}.xlsx`);
+    push({ type: "success", message: "Eksport zakończony." });
   };
 
   // ---------------------------------
   // XLSX — IMPORT SZABLONÓW (walidacja nazw)
   // ---------------------------------
-
   const handleImportXlsx: React.ChangeEventHandler<HTMLInputElement> = async (
     e
   ) => {
@@ -394,7 +385,6 @@ const TestTemplates: React.FC = () => {
         const allowHalfPoints = parseBool(r.AllowHalfPoints ?? r.Halves ?? true);
 
         const halves = !!allowHalfPoints;
-        // sane defaults + zaokrąglenie do kroku
         const minPoints = snapByRule(Number.isFinite(minRaw) ? minRaw : 0, halves);
         const maxPoints = snapByRule(
           Number.isFinite(maxRaw) ? Math.max(maxRaw, minPoints) : Math.max(1, minPoints),
@@ -464,15 +454,15 @@ const TestTemplates: React.FC = () => {
       }
 
       await fetchTemplates();
-      setMessage({
+      push({
         type: (fail || skippedDuplicates) ? "error" : "success",
-        text:
+        message:
           `Zaimportowano ${ok} szablon(y).` +
           (skippedDuplicates ? ` Nazwa szablonu już istnieje.`: "") +
           (fail ? ` Błędy: ${fail}.` : ""),
       });
     } catch {
-      setMessage({ type: "error", text: "Nie udało się zaimportować pliku." });
+      push({ type: "error", message: "Nie udało się zaimportować pliku." });
     } finally {
       e.target.value = "";
     }
@@ -541,7 +531,6 @@ const TestTemplates: React.FC = () => {
                 className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
                 onClick={() => {
                   setShowAddForm(true);
-                  setMessage(null);
                   resetAddForm();
                 }}
               >
@@ -550,24 +539,86 @@ const TestTemplates: React.FC = () => {
             </div>
           </div>
 
-          {/* Komunikaty */}
-          {message && (
-            <div
-              className={`mb-4 text-center font-medium text-sm rounded-lg py-2 px-4 ${
-                message.type === "error"
-                  ? "text-red-600 bg-red-50"
-                  : message.type === "success"
-                  ? "text-teal-600 bg-teal-50"
-                  : "text-gray-600 bg-gray-100"
-              }`}
-            >
-              {message.text}
+          {/* Lista szablonów */}
+          {loading ? (
+            <div>Ładowanie...</div>
+          ) : templates.length === 0 ? (
+            <div className="mt-7 text-gray-400">Brak szablonów testów.</div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {templates.map((template) => (
+                <div
+                  key={template.id}
+                  className="bg-white rounded-xl shadow p-5 flex flex-col gap-3"
+                >
+                  <div className="flex-1">
+                    <span className="font-bold text-lg">{template.name}</span>
+                    <div className="mt-2">
+                      {template.tasks.length === 0 ? (
+                        <div className="text-gray-400 text-sm">Brak zadań</div>
+                      ) : (
+                        template.tasks.map((task, idx) => (
+                          <div key={task.id || idx} className="text-sm my-1">
+                            <span className="font-semibold">
+                              Zadanie {idx + 1}.
+                            </span>{" "}
+                            {task.description}{" "}
+                            <span className="text-xs text-gray-400">
+                              ({task.minPoints}-{task.maxPoints} pkt,{" "}
+                              {task.allowHalfPoints ? "połówki: TAK" : "połówki: NIE"}
+                              )
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 justify-end self-end">
+                    <button
+                      className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
+                      onClick={() => openEdit(template)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
+                      onClick={() => handleDeleteTemplate(template.id)}
+                    >
+                      Delete
+                    </button>
+
+                    {/* Ikonowy przycisk eksportu */}
+                    <button
+                      className="p-2 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-300 transition group"
+                      onClick={() => exportOneTemplateXlsx(template)}
+                      type="button"
+                      title="Eksportuj ten szablon"
+                      aria-label="Eksportuj ten szablon"
+                    >
+  <svg
+    className="w-5 h-5 text-gray-600 group-hover:text-gray-800"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 3v10" />
+    <path d="M8.5 6.5 12 3l3.5 3.5" />
+    <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+  </svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
           {/* Formularz DODAWANIA */}
           {showAddForm && (
-            <div className="bg-white rounded-xl shadow-md p-6 mb-8">
+            <div className="bg-white rounded-xl shadow-md p-6 mt-8">
               <h3 className="text-lg font-bold mb-4">Nowy szablon testu</h3>
               <form onSubmit={handleAddSubmit}>
                 <label className="block mb-2 font-semibold">
@@ -746,69 +797,6 @@ const TestTemplates: React.FC = () => {
                   </button>
                 </div>
               </form>
-            </div>
-          )}
-
-          {/* Lista szablonów */}
-          {loading ? (
-            <div>Ładowanie...</div>
-          ) : templates.length === 0 ? (
-            <div className="mt-7 text-gray-400">Brak szablonów testów.</div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {templates.map((template) => (
-                <div
-                  key={template.id}
-                  className="bg-white rounded-xl shadow p-5 flex flex-col gap-3"
-                >
-                    <div className="flex-1">
-                      <span className="font-bold text-lg">{template.name}</span>
-                      <div className="mt-2">
-                        {template.tasks.length === 0 ? (
-                          <div className="text-gray-400 text-sm">Brak zadań</div>
-                        ) : (
-                          template.tasks.map((task, idx) => (
-                            <div key={task.id || idx} className="text-sm my-1">
-                              <span className="font-semibold">
-                                Zadanie {idx + 1}.
-                              </span>{" "}
-                              {task.description}{" "}
-                              <span className="text-xs text-gray-400">
-                                ({task.minPoints}-{task.maxPoints} pkt,{" "}
-                                {task.allowHalfPoints
-                                  ? "połówki: TAK"
-                                  : "połówki: NIE"}
-                                )
-                              </span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-3 justify-end self-end">
-                      <button
-                        className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
-                        onClick={() => openEdit(template)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
-                        onClick={() => handleDeleteTemplate(template.id)}
-                      >
-                        Delete
-                      </button>
-                      <button
-                        className="hover:bg-gray-100 text-gray-600 font-semibold px-3 py-1.5 rounded-lg transition"
-                        onClick={() => exportOneTemplateXlsx(template)}
-                        type="button"
-                        title="Eksportuj ten szablon"
-                      >
-                        Eksportuj
-                      </button>
-                  </div>
-                </div>
-              ))}
             </div>
           )}
         </div>

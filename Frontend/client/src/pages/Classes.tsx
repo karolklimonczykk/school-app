@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Sidebar from "../components/Sidebar/Sidebar";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useToast } from "../components/Toast";
 
 // Typy
 type School = {
@@ -24,8 +25,6 @@ const Classes: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState<number | "">("");
   const [newClassName, setNewClassName] = useState("");
-  const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState<"" | "error" | "success">("");
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,6 +32,7 @@ const Classes: React.FC = () => {
 
   const location = useLocation();
   const navigate = useNavigate();
+  const { push } = useToast();
 
   // Obsługa "prefiltracji" przez query string (np. /classes?school=3)
   useEffect(() => {
@@ -53,30 +53,30 @@ const Classes: React.FC = () => {
     // eslint-disable-next-line
   }, [schools, selectedSchoolId]);
 
+  const tokenHeader = () => ({
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  });
+
   // Pobierz szkoły
   const fetchSchools = async () => {
-    const token = localStorage.getItem("token");
     try {
       const res = await axios.get<School[]>("http://localhost:4000/schools", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: tokenHeader(),
       });
       setSchools(res.data);
     } catch {
-      setMessageType("error");
-      setMessage("Błąd pobierania szkół!");
+      push({ type: "error", message: "Błąd pobierania szkół!" });
     }
   };
 
   // Pobierz klasy (wszystkie lub tylko dla danej szkoły)
   const fetchClasses = async () => {
     setLoading(true);
-    const token = localStorage.getItem("token");
-    setMessage("");
     try {
       if (selectedSchoolId) {
         const res = await axios.get<SchoolClass[]>(
           `http://localhost:4000/schools/${selectedSchoolId}/classes`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: tokenHeader() }
         );
         setClasses(
           res.data.map((cls) => ({
@@ -90,7 +90,7 @@ const Classes: React.FC = () => {
       } else {
         const res = await axios.get<SchoolClass[]>(
           "http://localhost:4000/classes",
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: tokenHeader() }
         );
         setClasses(
           res.data.map((cls) => ({
@@ -104,15 +104,14 @@ const Classes: React.FC = () => {
         );
       }
     } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        setMessageType("error");
-        setMessage(err.response?.data?.error || "Błąd pobierania klasy");
-      } else {
-        setMessageType("error");
-        setMessage("Błąd pobierania klasy");
-      }
+      push({
+        type: "error",
+        message: axios.isAxiosError(err)
+          ? err.response?.data?.error || "Błąd pobierania klas"
+          : "Błąd pobierania klas",
+      });
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -120,35 +119,35 @@ const Classes: React.FC = () => {
   const handleAddClass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSchoolId) {
-      setMessage("Najpierw wybierz szkołę do której chcesz dodać klasę!");
+      push({
+        type: "error",
+        message: "Najpierw wybierz szkołę do której chcesz dodać klasę!",
+      });
       return;
     }
-    setMessage("");
-    const token = localStorage.getItem("token");
     try {
       const res = await axios.post<SchoolClass>(
         `http://localhost:4000/schools/${selectedSchoolId}/classes`,
         { name: newClassName },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: tokenHeader() }
       );
       setClasses([
         ...classes,
         {
           ...res.data,
-          schoolName:
-            schools.find((s) => s.id === selectedSchoolId)?.name || "",
+          schoolName: schools.find((s) => s.id === selectedSchoolId)?.name || "",
         },
       ]);
       setNewClassName("");
-      setMessage("Klasa dodana!");
+      setShowAddInput(false);
+      push({ type: "success", message: "Klasa dodana!" });
     } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        setMessageType("error");
-        setMessage(err.response?.data?.error || "Błąd dodawania klasy");
-      } else {
-        setMessageType("error");
-        setMessage("Błąd dodawania klasy");
-      }
+      push({
+        type: "error",
+        message: axios.isAxiosError(err)
+          ? err.response?.data?.error || "Błąd dodawania klasy"
+          : "Błąd dodawania klasy",
+      });
     }
   };
 
@@ -159,12 +158,11 @@ const Classes: React.FC = () => {
   };
 
   const handleSaveEdit = async (classId: number, schoolId: number) => {
-    const token = localStorage.getItem("token");
     try {
       const res = await axios.put(
         `http://localhost:4000/schools/${schoolId}/classes/${classId}`,
         { name: editName },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: tokenHeader() }
       );
       setClasses(
         classes.map((cls) =>
@@ -175,13 +173,14 @@ const Classes: React.FC = () => {
       );
       setEditId(null);
       setEditName("");
-      setMessage("Klasa zaktualizowana!");
+      push({ type: "success", message: "Klasa zaktualizowana!" });
     } catch (err: unknown) {
-      setMessage(
-        axios.isAxiosError(err)
+      push({
+        type: "error",
+        message: axios.isAxiosError(err)
           ? err.response?.data?.error || "Błąd edycji klasy"
-          : "Błąd edycji klasy"
-      );
+          : "Błąd edycji klasy",
+      });
     }
   };
 
@@ -193,19 +192,15 @@ const Classes: React.FC = () => {
   // Usuń klasę
   const handleDeleteClass = async (classId: number, schoolId: number) => {
     if (!window.confirm("Na pewno usunąć tę klasę?")) return;
-    setMessage("");
-    const token = localStorage.getItem("token");
     try {
       await axios.delete(
         `http://localhost:4000/schools/${schoolId}/classes/${classId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: tokenHeader() }
       );
       setClasses(classes.filter((cls) => cls.id !== classId));
-      setMessage("Klasa usunięta!");
+      push({ type: "success", message: "Klasa usunięta!" });
     } catch {
-      setMessage("Błąd usuwania klasy");
+      push({ type: "error", message: "Błąd usuwania klasy" });
     }
   };
 
@@ -237,8 +232,7 @@ const Classes: React.FC = () => {
                   onChange={handleFilterSchool}
                   title={
                     selectedSchoolId
-                      ? schools.find((s) => s.id === selectedSchoolId)?.name ??
-                        ""
+                      ? schools.find((s) => s.id === selectedSchoolId)?.name ?? ""
                       : "Wszystkie szkoły"
                   }
                 >
@@ -265,12 +259,13 @@ const Classes: React.FC = () => {
               <button
                 onClick={() => {
                   if (!selectedSchoolId) {
-                    setMessageType("error");
-                    setMessage("Wybierz szkołę, do której chcesz dodać klasę!");
+                    push({
+                      type: "error",
+                      message:
+                        "Wybierz szkołę, do której chcesz dodać klasę!",
+                    });
                     return;
                   }
-                  setMessageType("");
-                  setMessage("");
                   setShowAddInput(true);
                 }}
                 className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
@@ -282,10 +277,7 @@ const Classes: React.FC = () => {
 
           {/* Dodawanie klasy */}
           {showAddInput && selectedSchoolId && (
-            <form
-              onSubmit={handleAddClass}
-              className="mb-7 flex gap-2 items-end"
-            >
+            <form onSubmit={handleAddClass} className="mb-7 flex gap-2 items-end">
               <input
                 type="text"
                 placeholder="Nazwa klasy"
@@ -314,19 +306,6 @@ const Classes: React.FC = () => {
                 Anuluj
               </button>
             </form>
-          )}
-
-          {/* Wiadomości */}
-          {message && (
-            <div
-              className={`mb-4 text-center font-medium text-sm rounded-lg py-2 px-4 ${
-                messageType === "error"
-                  ? "text-red-600 bg-red-50"
-                  : "text-teal-600 bg-teal-50"
-              }`}
-            >
-              {message}
-            </div>
           )}
 
           {/* Tabela */}
@@ -363,19 +342,18 @@ const Classes: React.FC = () => {
                       className="transition hover:bg-gray-50"
                       style={{
                         borderColor: "#ececec",
-                        borderWidth:
-                          idx !== classes.length - 1 ? "0.2px" : 0,
+                        borderWidth: idx !== classes.length - 1 ? "0.2px" : 0,
                       }}
                     >
                       {/* COL 1: CLASS NAME / input */}
                       <td className="flex items-center gap-4 py-5 pl-6 min-w-[250px]">
                         {editId === cls.id ? (
-                            <input
-                              className="border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:border-teal-400"
-                              value={editName}
-                              onChange={(e) => setEditName(e.target.value)}
-                              autoFocus
-                            />
+                          <input
+                            className="border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:border-teal-400"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            autoFocus
+                          />
                         ) : (
                           <Link
                             to={`/students?school=${cls.schoolId}&class=${cls.id}`}
@@ -400,9 +378,7 @@ const Classes: React.FC = () => {
                             <>
                               <button
                                 className="text-teal-500 font-semibold px-2 py-1 hover:bg-teal-50 rounded transition"
-                                onClick={() =>
-                                  handleSaveEdit(cls.id, cls.schoolId)
-                                }
+                                onClick={() => handleSaveEdit(cls.id, cls.schoolId)}
                                 type="button"
                               >
                                 Save
@@ -425,9 +401,7 @@ const Classes: React.FC = () => {
                               </button>
                               <button
                                 className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
-                                onClick={() =>
-                                  handleDeleteClass(cls.id, cls.schoolId)
-                                }
+                                onClick={() => handleDeleteClass(cls.id, cls.schoolId)}
                               >
                                 Delete
                               </button>

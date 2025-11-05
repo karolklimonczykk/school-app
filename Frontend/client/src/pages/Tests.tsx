@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Sidebar from "../components/Sidebar/Sidebar";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useToast } from "../components/Toast";
 
 type School = { id: number; name: string };
 type SchoolClass = { id: number; name: string; schoolId: number };
@@ -38,6 +39,7 @@ const Tests: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const token = localStorage.getItem("token");
+  const { push } = useToast();
 
   // —— Filtry i dane bazowe
   const [schools, setSchools] = useState<School[]>([]);
@@ -61,10 +63,6 @@ const Tests: React.FC = () => {
     {}
   );
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{
-    type: "info" | "error" | "success";
-    text: string;
-  } | null>(null);
 
   // —— Progress
   const [progress, setProgress] = useState<Record<number, number>>({}); // studentId -> liczba wypełnionych zadań
@@ -128,7 +126,7 @@ const Tests: React.FC = () => {
           (tplRes.data || []).map((t: any) => ({ id: t.id, name: t.name }))
         );
       } catch {
-        setMessage({ type: "error", text: "Błąd ładowania szkół/szablonów." });
+        push({ type: "error", message: "Błąd ładowania szkół/szablonów." });
       }
     };
     fetchBase();
@@ -149,7 +147,7 @@ const Tests: React.FC = () => {
         );
         setClasses(res.data);
       } catch {
-        setMessage({ type: "error", text: "Błąd pobierania klas." });
+        push({ type: "error", message: "Błąd pobierania klas." });
         setClasses([]);
       }
     };
@@ -215,7 +213,7 @@ const Tests: React.FC = () => {
           setStudents(res.data);
         }
       } catch {
-        setMessage({ type: "error", text: "Błąd pobierania uczniów." });
+        push({ type: "error", message: "Błąd pobierania uczniów." });
         setStudents([]);
       }
     };
@@ -272,13 +270,13 @@ const Tests: React.FC = () => {
   // —— Operacje na sesji
   const handleCreate = async () => {
     if (!templateId || !sessionName.trim()) {
-      setMessage({ type: "error", text: "Wybierz szablon i wpisz nazwę." });
+      push({ type: "error", message: "Wybierz szablon i wpisz nazwę." });
       return;
     }
     if (duplicateName) {
-      setMessage({
+      push({
         type: "error",
-        text: "Sesja o tej nazwie i dla tego szablonu już istnieje.",
+        message: "Sesja o tej nazwie i dla tego szablonu już istnieje.",
       });
       return;
     }
@@ -295,13 +293,13 @@ const Tests: React.FC = () => {
       setShowSessionModal(false);
       setSessionName(res.data.name);
       await fetchTasksCount(res.data.templateId);
-      setMessage({ type: "success", text: "Utworzono sesję." });
+      push({ type: "success", message: "Utworzono sesję." });
     } catch (err: any) {
       const msg =
         err?.response?.status === 409
           ? "Sesja o tej nazwie i dla tego szablonu już istnieje."
           : "Nie udało się utworzyć sesji.";
-      setMessage({ type: "error", text: msg });
+      push({ type: "error", message: msg });
     }
   };
 
@@ -314,7 +312,7 @@ const Tests: React.FC = () => {
     setSessionName(s.name);
     setTemplateId(s.templateId);
     await fetchTasksCount(s.templateId);
-    setMessage({ type: "success", text: "Wczytano sesję." });
+    push({ type: "success", message: "Wczytano sesję." });
   };
 
   const handleRename = async (id: number, newName: string) => {
@@ -332,13 +330,13 @@ const Tests: React.FC = () => {
         prev.map((s) => (s.id === id ? { ...s, name: res.data.name } : s))
       );
       if (testId === id) setSessionName(res.data.name);
-      setMessage({ type: "success", text: "Zmieniono nazwę sesji." });
+      push({ type: "success", message: "Zmieniono nazwę sesji." });
     } catch (err: any) {
       const msg =
         err?.response?.status === 409
           ? "Sesja o tej nazwie i dla tego szablonu już istnieje."
           : "Nie udało się zmienić nazwy.";
-      setMessage({ type: "error", text: msg });
+      push({ type: "error", message: msg });
     }
   };
 
@@ -357,9 +355,9 @@ const Tests: React.FC = () => {
         setCurrentStudentId(null);
         setShowSessionModal(true);
       }
-      setMessage({ type: "success", text: "Usunięto sesję." });
+      push({ type: "success", message: "Usunięto sesję." });
     } catch {
-      setMessage({ type: "error", text: "Nie udało się usunąć sesji." });
+      push({ type: "error", message: "Nie udało się usunąć sesji." });
     }
   };
 
@@ -378,9 +376,9 @@ const Tests: React.FC = () => {
     const draft = editName.trim();
     if (!draft) return;
     if (isDuplicateRename(id, draft)) {
-      setMessage({
+      push({
         type: "error",
-        text: "Sesja o tej nazwie i dla tego szablonu już istnieje.",
+        message: "Sesja o tej nazwie i dla tego szablonu już istnieje.",
       });
       return;
     }
@@ -391,7 +389,7 @@ const Tests: React.FC = () => {
   // —— Wyniki bieżącego ucznia
   const selectStudent = async (studentId: number) => {
     if (!testId) {
-      setMessage({ type: "error", text: "Najpierw wybierz/utwórz sesję." });
+      push({ type: "error", message: "Najpierw wybierz/utwórz sesję." });
       return;
     }
     try {
@@ -405,7 +403,7 @@ const Tests: React.FC = () => {
         setTotalTasks(res.data.tasks.length);
       setTaskErrors({});
     } catch {
-      setMessage({ type: "error", text: "Błąd pobierania zadań/wyników." });
+      push({ type: "error", message: "Błąd pobierania zadań/wyników." });
     }
   };
 
@@ -456,7 +454,7 @@ const Tests: React.FC = () => {
   const saveCurrent = async (goNext = false) => {
     if (!testId || !currentStudentId) return;
     if (Object.values(taskErrors).some(Boolean)) {
-      setMessage({ type: "error", text: "Popraw zaznaczone pola z punktami." });
+      push({ type: "error", message: "Popraw zaznaczone pola z punktami." });
       return;
     }
     setSaving(true);
@@ -471,7 +469,7 @@ const Tests: React.FC = () => {
         { results },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setMessage({ type: "success", text: "Zapisano." });
+      push({ type: "success", message: "Zapisano." });
 
       const params = new URLSearchParams();
       if (selectedSchoolId) params.set("schoolId", String(selectedSchoolId));
@@ -489,9 +487,9 @@ const Tests: React.FC = () => {
         if (next) selectStudent(next);
       }
     } catch (e: any) {
-      setMessage({
+      push({
         type: "error",
-        text: e?.response?.data?.error || "Błąd zapisu.",
+        message: e?.response?.data?.error || "Błąd zapisu.",
       });
     } finally {
       setSaving(false);
@@ -616,20 +614,6 @@ const Tests: React.FC = () => {
               </span>
             </div>
           </div>
-
-          {message && (
-            <div
-              className={`mb-4 text-center font-medium text-sm rounded-lg py-2 px-4 ${
-                message.type === "error"
-                  ? "text-red-600 bg-red-50"
-                  : message.type === "success"
-                  ? "text-teal-600 bg-teal-50"
-                  : "text-gray-600 bg-gray-100"
-              }`}
-            >
-              {message.text}
-            </div>
-          )}
 
           {/* 2-kolumnowy layout: uczniowie + panel ocen */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -766,7 +750,7 @@ const Tests: React.FC = () => {
                   <div className="flex gap-3 justify-end mt-5">
                     <button
                       className="text-gray-500 font-semibold hover:bg-gray-100 rounded-md px-4 py-2 transition"
-                      onClick={() => selectStudent(currentStudentId)}
+                      onClick={() => selectStudent(currentStudentId!)}
                       type="button"
                     >
                       Odrzuć zmiany
@@ -874,127 +858,127 @@ const Tests: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody>
-  {sessions.map((s, idx) => {
-    const isLast = idx === sessions.length - 1;
-    const isEditing = editId === s.id;
-    const duplicate = isEditing && isDuplicateRename(s.id, editName);
-    const selected = selectedLoadId === s.id;
+                        {sessions.map((s, idx) => {
+                          const isLast = idx === sessions.length - 1;
+                          const isEditing = editId === s.id;
+                          const duplicate =
+                            isEditing && isDuplicateRename(s.id, editName);
+                          const selected = selectedLoadId === s.id;
 
-    return (
-      <tr
-        key={s.id}
-        className={`${!isLast ? "border-b" : ""} transition hover:bg-gray-50 ${
-          selected ? "bg-teal-50" : ""
-        }`}
-        style={{
-          borderColor: "#ececec",
-          borderWidth: !isLast ? "0.2px" : 0,
-          cursor: isEditing ? "default" : "pointer",
-        }}
-        onClick={() => {
-          if (!isEditing) setSelectedLoadId(s.id);
-        }}
-        aria-selected={selected}
-      >
-        {/* kolumna z nazwą / inputem */}
-        <td className="py-5 pl-6 min-w-[250px] pr-4">
-          {isEditing ? (
-            <div className="flex flex-col gap-1 w-full max-w-xs">
-              <input
-                className={`border rounded-lg px-3 py-1 focus:outline-none ${
-                  duplicate
-                    ? "border-red-300 focus:border-red-500"
-                    : "border-gray-300 focus:border-teal-400"
-                }`}
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                autoFocus
-              />
-              {duplicate && (
-                <div className="text-[11px] text-red-600">
-                  Sesja o tej nazwie i dla tego szablonu już istnieje.
-                </div>
-              )}
-            </div>
-          ) : (
-            <span className="text-gray-800 font-semibold text-base break-all">
-              {s.name}
-            </span>
-          )}
-        </td>
+                          return (
+                            <tr
+                              key={s.id}
+                              className={`${!isLast ? "border-b" : ""} transition hover:bg-gray-50 ${
+                                selected ? "bg-teal-50" : ""
+                              }`}
+                              style={{
+                                borderColor: "#ececec",
+                                borderWidth: !isLast ? "0.2px" : 0,
+                                cursor: isEditing ? "default" : "pointer",
+                              }}
+                              onClick={() => {
+                                if (!isEditing) setSelectedLoadId(s.id);
+                              }}
+                              aria-selected={selected}
+                            >
+                              {/* kolumna z nazwą / inputem */}
+                              <td className="py-5 pl-6 min-w-[250px] pr-4">
+                                {isEditing ? (
+                                  <div className="flex flex-col gap-1 w-full max-w-xs">
+                                    <input
+                                      className={`border rounded-lg px-3 py-1 focus:outline-none ${
+                                        duplicate
+                                          ? "border-red-300 focus:border-red-500"
+                                          : "border-gray-300 focus:border-teal-400"
+                                      }`}
+                                      value={editName}
+                                      onChange={(e) => setEditName(e.target.value)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      autoFocus
+                                    />
+                                    {duplicate && (
+                                      <div className="text-[11px] text-red-600">
+                                        Sesja o tej nazwie i dla tego szablonu już istnieje.
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-800 font-semibold text-base break-all">
+                                    {s.name}
+                                  </span>
+                                )}
+                              </td>
 
-        {/* Template */}
-        <td className="text-gray-800 py-5 pr-4">
-          {s.template?.name || "-"}
-        </td>
+                              {/* Template */}
+                              <td className="text-gray-800 py-5 pr-4">
+                                {s.template?.name || "-"}
+                              </td>
 
-        {/* Data */}
-        <td className="text-gray-800 py-5 pr-4">
-          {new Date(s.date).toLocaleDateString()}
-        </td>
+                              {/* Data */}
+                              <td className="text-gray-800 py-5 pr-4">
+                                {new Date(s.date).toLocaleDateString()}
+                              </td>
 
-        {/* Akcje */}
-        <td className="pr-6 text-right">
-          {isEditing ? (
-            <div className="flex gap-3 justify-end">
-              <button
-                className="text-teal-500 font-semibold px-3 py-1 hover:bg-teal-50 rounded transition disabled:opacity-50"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSaveEdit(s.id);
-                }}
-                type="button"
-                disabled={!editName.trim() || !!duplicate}
-              >
-                Save
-              </button>
-              <button
-                className="text-gray-400 font-semibold px-3 py-1 hover:bg-gray-100 rounded transition"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCancelEdit();
-                }}
-                type="button"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <div className="flex gap-3 justify-end">
-              <button
-                className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleStartEdit(s);
-                }}
-              >
-                Edit
-              </button>
-              <button
-                className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(s.id);
-                }}
-              >
-                Delete
-              </button>
-            </div>
-          )}
-        </td>
-      </tr>
-    );
-  })}
-  {sessions.length === 0 && (
-    <tr>
-      <td colSpan={4} className="py-10 text-center text-gray-400">
-        No sessions to display.
-      </td>
-    </tr>
-  )}
-</tbody>
-
+                              {/* Akcje */}
+                              <td className="pr-6 text-right">
+                                {isEditing ? (
+                                  <div className="flex gap-3 justify-end">
+                                    <button
+                                      className="text-teal-500 font-semibold px-3 py-1 hover:bg-teal-50 rounded transition disabled:opacity-50"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSaveEdit(s.id);
+                                      }}
+                                      type="button"
+                                      disabled={!editName.trim() || !!duplicate}
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      className="text-gray-400 font-semibold px-3 py-1 hover:bg-gray-100 rounded transition"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCancelEdit();
+                                      }}
+                                      type="button"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex gap-3 justify-end">
+                                    <button
+                                      className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleStartEdit(s);
+                                      }}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDelete(s.id);
+                                      }}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {sessions.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="py-10 text-center text-gray-400">
+                              No sessions to display.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
                     </table>
                   </div>
 

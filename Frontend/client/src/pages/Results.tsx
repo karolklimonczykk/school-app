@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Sidebar from "../components/Sidebar/Sidebar";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useToast } from "../components/Toast";
 
 type School = { id: number; name: string };
 type SchoolClass = { id: number; name: string; schoolId: number };
@@ -67,8 +68,8 @@ type TaskMetric =
   | "p"
   | "q"
   | "f"
-  | "varianceRaw" // wartości rzeczywiste
-  | "discriminationRaw"; // wartości rzeczywiste (mogą być ujemne)
+  | "varianceRaw"
+  | "discriminationRaw";
 
 type StudentMetric = "percent" | "points";
 
@@ -80,10 +81,10 @@ const metricLegend: Record<TaskMetric, string> = {
   varianceRaw: "Wariancja (S²)",
   discriminationRaw: "Moc różnicująca (r) [-1,1]",
 };
-// Konfiguracja osi Y dla wykresu zadań
 
 const fmt2 = (x: number) => (Number.isFinite(x) ? x.toFixed(2) : String(x));
-// "Ładne" ticki osi (D3-like)
+
+// "Ładne" ticki osi
 const niceNum = (range: number, round: boolean) => {
   const exponent = Math.floor(Math.log10(range || 1));
   const fraction = range / Math.pow(10, exponent);
@@ -118,6 +119,7 @@ const Results: React.FC = () => {
   const token = localStorage.getItem("token");
   const navigate = useNavigate();
   const location = useLocation();
+  const { push } = useToast();
 
   // Filtry
   const [schools, setSchools] = useState<School[]>([]);
@@ -129,41 +131,30 @@ const Results: React.FC = () => {
 
   // Dane analityczne
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [message, setMessage] = useState<{
-    type: "error" | "success" | "info";
-    text: string;
-  } | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Zakładki na stronie
+  // Zakładki
   const [tab, setTab] = useState<"tasks" | "students">("tasks");
   const [taskMetric, setTaskMetric] = useState<TaskMetric>("p");
   const [studentMetric, setStudentMetric] = useState<StudentMetric>("percent");
 
   // --- OŚ Y dla wykresu zadań (zależna od taskMetric) ---
   const yAxisTasks = useMemo(() => {
-    // fallback – gdy brak danych, żeby nic się nie wywaliło
     const items = overview?.items ?? [];
     const maxVar = items.length ? Math.max(...items.map((i) => i.variance)) : 1;
-    const discMin = items.length
-      ? Math.min(...items.map((i) => i.discrimination))
-      : -1;
-    const discMax = items.length
-      ? Math.max(...items.map((i) => i.discrimination))
-      : 1;
+    const discMin = items.length ? Math.min(...items.map((i) => i.discrimination)) : -1;
+    const discMax = items.length ? Math.max(...items.map((i) => i.discrimination)) : 1;
 
-    // metryki 0..1
     if (["p", "q", "f"].includes(taskMetric)) {
       return {
         ticks: [0, 0.25, 0.5, 0.75, 1],
-        toPct: (v: number) => v * 100, // v ∈ [0..1]
+        toPct: (v: number) => v * 100,
         format: (v: number) => v.toFixed(2),
         title: metricLegend[taskMetric as TaskMetric],
         zeroPct: 0,
       };
     }
 
-    // Wariancja (raw) – skala rzeczywista 0..niceMax
     if (taskMetric === "varianceRaw") {
       const safeMax = Math.max(0, maxVar);
       const { ticks, niceMin, niceMax } = makeNiceTicks(0, safeMax || 1, 5);
@@ -177,8 +168,6 @@ const Results: React.FC = () => {
       };
     }
 
-    // Moc różnicująca (raw) – skala rzeczywista (obejmuje ujemne)
-    // domyślnie wymuszamy przedział co najmniej [-1,1]
     const dMin = Math.min(-1, discMin);
     const dMax = Math.max(1, discMax);
     const { ticks, niceMin, niceMax } = makeNiceTicks(dMin, dMax, 5);
@@ -192,18 +181,17 @@ const Results: React.FC = () => {
     };
   }, [taskMetric, overview]);
 
-  // --- OŚ Y dla wykresu uczniów (zależna od trybu + MAX pkt) ---
+  // --- OŚ Y dla wykresu uczniów ---
   const yAxisStudents = useMemo(() => {
     const max = overview?.header.totalMax ?? 0;
     if (!overview || max <= 0 || studentMetric === "percent") {
       return {
         ticks: [0, 25, 50, 75, 100],
-        toPct: (v: number) => v, // 0..100
+        toPct: (v: number) => v,
         format: (v: number) => `${v}%`,
         title: "Procent wyniku [%]",
       };
     }
-    // tryb punktowy: 0..MAX pkt, pięć równych podziałek
     const tickVals = [0, 0.25 * max, 0.5 * max, 0.75 * max, 1 * max];
     return {
       ticks: tickVals,
@@ -224,7 +212,7 @@ const Results: React.FC = () => {
     setSelectedTestId(t ? Number(t) : "");
   }, [location.search]);
 
-  // Szkoły + sesje (bez filtrowania)
+  // Szkoły + sesje
   useEffect(() => {
     const run = async () => {
       try {
@@ -239,7 +227,7 @@ const Results: React.FC = () => {
         setSchools(sch.data);
         setSessions(tests.data || []);
       } catch {
-        setMessage({ type: "error", text: "Błąd pobierania szkół/sesji." });
+        push({ type: "error", message: "Błąd pobierania szkół/sesji." });
       }
     };
     run();
@@ -261,6 +249,7 @@ const Results: React.FC = () => {
         setClasses(res.data);
       } catch {
         setClasses([]);
+        push({ type: "error", message: "Błąd pobierania klas." });
       }
     };
     load();
@@ -288,7 +277,7 @@ const Results: React.FC = () => {
       setOverview(res.data);
     } catch {
       setOverview(null);
-      setMessage({ type: "error", text: "Błąd analizy wyników." });
+      push({ type: "error", message: "Błąd analizy wyników." });
     } finally {
       setLoading(false);
     }
@@ -330,21 +319,19 @@ const Results: React.FC = () => {
     if (studentMetric === "percent") {
       return overview.students.map((s, idx) => ({
         lp: idx + 1,
-        value: (s.total / max) * 100, // wysokość w %
-        raw: (s.total / max) * 100, // wartość do etykiety
+        value: (s.total / max) * 100,
+        raw: (s.total / max) * 100,
         label: `${Math.round((s.total / max) * 100)}%`,
         tooltip: `Lp. ${idx + 1}: ${s.total.toFixed(2)} pkt (${(
-          (s.total / max) *
-          100
+          (s.total / max) * 100
         ).toFixed(0)}%)`,
       }));
     }
 
-    // tryb punktowy
     return overview.students.map((s, idx) => ({
       lp: idx + 1,
-      value: (s.total / max) * 100, // wysokość nadal w %
-      raw: s.total, // wartość do etykiety
+      value: (s.total / max) * 100,
+      raw: s.total,
       label: s.total % 1 === 0 ? `${s.total}` : s.total.toFixed(2),
       tooltip: `Lp. ${idx + 1}: ${s.total.toFixed(2)} pkt`,
     }));
@@ -438,16 +425,15 @@ const Results: React.FC = () => {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const safeName = (overview.header.testName || "results").replace(
-      /[^\w\d-_]+/g,
-      "_"
-    );
+    const safeName = (overview.header.testName || "results").replace(/[^\w\d-_]+/g, "_");
     a.href = url;
     a.download = `${safeName}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
+    push({ type: "success", message: "Wyeksportowano plik CSV." });
   };
 
   return (
@@ -502,14 +488,7 @@ const Results: React.FC = () => {
                 ))}
               </select>
               <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-500">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M6 9l6 6 6-6" />
                 </svg>
               </span>
@@ -526,8 +505,7 @@ const Results: React.FC = () => {
                   const q = new URLSearchParams(location.search);
                   if (val && selectedSchoolId) q.set("class", String(val));
                   else q.delete("class");
-                  if (selectedSchoolId)
-                    q.set("school", String(selectedSchoolId));
+                  if (selectedSchoolId) q.set("school", String(selectedSchoolId));
                   navigate(`/results?${q.toString()}`);
                 }}
                 disabled={!selectedSchoolId}
@@ -540,14 +518,7 @@ const Results: React.FC = () => {
                 ))}
               </select>
               <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-500">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M6 9l6 6 6-6" />
                 </svg>
               </span>
@@ -564,8 +535,7 @@ const Results: React.FC = () => {
                   const q = new URLSearchParams(location.search);
                   if (val) q.set("test", String(val));
                   else q.delete("test");
-                  if (selectedSchoolId)
-                    q.set("school", String(selectedSchoolId));
+                  if (selectedSchoolId) q.set("school", String(selectedSchoolId));
                   if (selectedClassId) q.set("class", String(selectedClassId));
                   navigate(`/results?${q.toString()}`);
                 }}
@@ -573,47 +543,23 @@ const Results: React.FC = () => {
                 <option value="">— wybierz sesję —</option>
                 {sessions.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name} — {s.template?.name ?? "?"} —{" "}
-                    {new Date(s.date).toLocaleDateString()}
+                    {s.name} — {s.template?.name ?? "?"} — {new Date(s.date).toLocaleDateString()}
                   </option>
                 ))}
               </select>
               <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-500">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M6 9l6 6 6-6" />
                 </svg>
               </span>
             </div>
           </div>
 
-          {message && (
-            <div
-              className={`mb-4 text-center font-medium text-sm rounded-lg py-2 px-4 ${
-                message.type === "error"
-                  ? "text-red-600 bg-red-50"
-                  : message.type === "success"
-                  ? "text-teal-600 bg-teal-50"
-                  : "text-gray-600 bg-gray-100"
-              }`}
-            >
-              {message.text}
-            </div>
-          )}
-
-          {/* KPI */}
+          {/* KPI / Treść */}
           {loading ? (
             <div className="text-gray-500">Ładowanie analizy…</div>
           ) : !selectedTestId ? (
-            <div className="text-gray-500">
-              Wybierz sesję, aby zobaczyć wyniki.
-            </div>
+            <div className="text-gray-500">Wybierz sesję, aby zobaczyć wyniki.</div>
           ) : !overview ? (
             <div className="text-gray-500">Brak danych do wyświetlenia.</div>
           ) : (
@@ -621,12 +567,8 @@ const Results: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                 <div className="bg-white rounded-xl shadow-md p-4">
                   <div className="text-xs text-gray-400">Sesja</div>
-                  <div className="font-semibold">
-                    {overview.header.testName}
-                  </div>
-                  <div className="text-xs text-gray-400">
-                    {overview.header.templateName}
-                  </div>
+                  <div className="font-semibold">{overview.header.testName}</div>
+                  <div className="text-xs text-gray-400">{overview.header.templateName}</div>
                 </div>
                 <div className="bg-white rounded-xl shadow-md p-4">
                   <div className="text-xs text-gray-400">Uczniów (n)</div>
@@ -634,36 +576,25 @@ const Results: React.FC = () => {
                 </div>
                 <div className="bg-white rounded-xl shadow-md p-4">
                   <div className="text-xs text-gray-400">Łatwość testu (p)</div>
-                  <div className="font-semibold">
-                    {(overview.header.pTest * 100).toFixed(0)}%
-                  </div>
+                  <div className="font-semibold">{(overview.header.pTest * 100).toFixed(0)}%</div>
                 </div>
                 <div className="bg-white rounded-xl shadow-md p-4">
-                  <div className="text-xs text-gray-400">
-                    Rzetelność testu α Cronbacha
-                  </div>
-                  <div className="font-semibold">
-                    {overview.summary.alpha.toFixed(2)}
-                  </div>
+                  <div className="text-xs text-gray-400">Rzetelność testu α Cronbacha</div>
+                  <div className="font-semibold">{overview.summary.alpha.toFixed(2)}</div>
                 </div>
                 <div className="bg-white rounded-xl shadow-md p-4">
-                  <div className="text-xs text-gray-400">
-                    Odch. std. / Błąd std.
-                  </div>
+                  <div className="text-xs text-gray-400">Odch. std. / Błąd std.</div>
                   <div className="font-semibold">
-                    {overview.summary.stdDev.toFixed(2)} /{" "}
-                    {overview.summary.stdError.toFixed(2)}
+                    {overview.summary.stdDev.toFixed(2)} / {overview.summary.stdError.toFixed(2)}
                   </div>
                 </div>
               </div>
 
-              {/* Zakładki strony */}
+              {/* Zakładki */}
               <div className="flex border-b border-gray-200 mb-4">
                 <button
                   className={`px-4 py-2 font-semibold ${
-                    tab === "tasks"
-                      ? "text-teal-600 border-b-2 border-teal-500"
-                      : "text-gray-500"
+                    tab === "tasks" ? "text-teal-600 border-b-2 border-teal-500" : "text-gray-500"
                   }`}
                   onClick={() => setTab("tasks")}
                 >
@@ -671,9 +602,7 @@ const Results: React.FC = () => {
                 </button>
                 <button
                   className={`px-4 py-2 font-semibold ${
-                    tab === "students"
-                      ? "text-teal-600 border-b-2 border-teal-500"
-                      : "text-gray-500"
+                    tab === "students" ? "text-teal-600 border-b-2 border-teal-500" : "text-gray-500"
                   }`}
                   onClick={() => setTab("students")}
                 >
@@ -681,7 +610,7 @@ const Results: React.FC = () => {
                 </button>
               </div>
 
-              {/* Zawartość zakładek – pełna szerokość */}
+              {/* Zawartość zakładek */}
               {tab === "tasks" ? (
                 <div className="grid grid-cols-1 gap-6">
                   {/* Wykres (zadania) */}
@@ -697,27 +626,16 @@ const Results: React.FC = () => {
                           <select
                             className="border border-gray-300 rounded-lg px-3 pr-8 py-1.5 bg-white text-sm focus:outline-none focus:border-teal-400 appearance-none"
                             value={taskMetric}
-                            onChange={(e) =>
-                              setTaskMetric(e.target.value as TaskMetric)
-                            }
+                            onChange={(e) => setTaskMetric(e.target.value as TaskMetric)}
                           >
                             <option value="p">Łatwość (p)</option>
                             <option value="q">Trudność (q)</option>
                             <option value="f">Frakcja opuszczeń (f)</option>
                             <option value="varianceRaw">Wariancja (S²)</option>
-                            <option value="discriminationRaw">
-                              Moc różnicująca (r)
-                            </option>
+                            <option value="discriminationRaw">Moc różnicująca (r)</option>
                           </select>
                           <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-gray-500">
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                            >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <path d="M6 9l6 6 6-6" />
                             </svg>
                           </span>
@@ -725,12 +643,9 @@ const Results: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Siatka: [kolumna tytułu Y | pudełko wykresu] */}
-                    <div
-                      className="grid"
-                      style={{ gridTemplateColumns: "8px 1fr" }}
-                    >
-                      {/* Tytuł osi Y (bez obramowania) */}
+                    {/* Siatka */}
+                    <div className="grid" style={{ gridTemplateColumns: "8px 1fr" }}>
+                      {/* Tytuł osi Y */}
                       <div className="relative h-74">
                         <div className="absolute inset-0 flex items-center justify-center pl-[4px]">
                           <div className="-rotate-90 text-xs text-gray-500 whitespace-nowrap">
@@ -738,29 +653,24 @@ const Results: React.FC = () => {
                           </div>
                         </div>
                       </div>
+
                       {/* Pudełko wykresu */}
                       <div className="relative h-74 rounded-lg">
-                        {/* Obszar roboczy: padding + rezerwa 24px na X-etykiety */}
                         <div className="absolute inset-x-3 top-3 bottom-6">
                           <div className="relative h-full flex">
-                            {/* Kolumna wartości Y – ta sama wysokość co linie i słupki */}
+                            {/* Wartości osi Y */}
                             <div className="relative w-10 mr-2">
                               {yAxisTasks.ticks.map((t, i) => {
-                                const pct = yAxisTasks.toPct(t); // 0..100
-                                const isZero = Math.abs(pct) < 1e-6; // 0%
+                                const pct = yAxisTasks.toPct(t);
+                                const isZero = Math.abs(pct) < 1e-6;
                                 return (
                                   <div
                                     key={i}
                                     className="absolute left-0 text-[10px] leading-[10px] text-gray-400 text-right w-full pr-1 pointer-events-none select-none"
                                     style={
                                       isZero
-                                        ? // 0.00 stoi NA linii bazowej
-                                          {
-                                            bottom: 0,
-                                            transform: "translateY(1px)",
-                                          }
-                                        : // pozostałe ticki – środek etykiety dokładnie na linii
-                                          { bottom: `calc(${pct}% - 3px)` }
+                                        ? { bottom: 0, transform: "translateY(1px)" }
+                                        : { bottom: `calc(${pct}% - 3px)` }
                                     }
                                   >
                                     {yAxisTasks.format(t as number)}
@@ -769,7 +679,7 @@ const Results: React.FC = () => {
                               })}
                             </div>
 
-                            {/* Warstwa linii + słupki */}
+                            {/* Linie + słupki */}
                             <div className="relative flex-1">
                               {yAxisTasks.ticks.map((t, i) => {
                                 const pct = yAxisTasks.toPct(t);
@@ -779,23 +689,16 @@ const Results: React.FC = () => {
                                     className="absolute left-0 right-0"
                                     style={{
                                       bottom: `${pct}%`,
-                                      borderTop:
-                                        pct === 0
-                                          ? "2px solid #e5e7eb"
-                                          : "1px dashed #eee",
+                                      borderTop: pct === 0 ? "2px solid #e5e7eb" : "1px dashed #eee",
                                     }}
                                   />
                                 );
                               })}
 
-                              {/* Słupki */}
                               <div
                                 className="relative h-full grid gap-2"
                                 style={{
-                                  gridTemplateColumns: `repeat(${Math.max(
-                                    taskBars.length,
-                                    1
-                                  )}, minmax(0, 1fr))`,
+                                  gridTemplateColumns: `repeat(${Math.max(taskBars.length, 1)}, minmax(0, 1fr))`,
                                 }}
                               >
                                 {taskBars.map((b) => {
@@ -805,31 +708,16 @@ const Results: React.FC = () => {
                                   const height = Math.abs(pct - zero);
 
                                   return (
-                                    <div
-                                      key={b.id}
-                                      className="flex flex-col items-center justify-end"
-                                    >
+                                    <div key={b.id} className="flex flex-col items-center justify-end">
                                       <div className="relative h-full w-full">
-                                        {/* słupek – rośnie w górę dla dodatnich i w dół dla ujemnych (przy raw r) */}
                                         <div
                                           className="absolute left-1/2 -translate-x-1/2 w-full max-w-[22px] mx-auto bg-teal-400 rounded"
-                                          style={{
-                                            bottom: `${bottom}%`,
-                                            height: `${height}%`,
-                                          }}
-                                          title={`Zad. ${b.label}: ${fmt2(
-                                            Number(b.raw)
-                                          )}`}
+                                          style={{ bottom: `${bottom}%`, height: `${height}%` }}
+                                          title={`Zad. ${b.label}: ${fmt2(Number(b.raw))}`}
                                         />
-                                        {/* wartość nad końcem słupka (dla ujemnych – nad 0) */}
                                         <div
                                           className="absolute left-1/2 -translate-x-1/2 text-[10px] text-gray-600"
-                                          style={{
-                                            bottom: `calc(${Math.max(
-                                              pct,
-                                              zero
-                                            )}% + 4px)`,
-                                          }}
+                                          style={{ bottom: `calc(${Math.max(pct, zero)}% + 4px)` }}
                                         >
                                           {fmt2(Number(b.raw))}
                                         </div>
@@ -842,17 +730,13 @@ const Results: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Etykiety X – w obrębie pudełka, wyrównane z siatką słupków */}
+                        {/* Oś X */}
                         <div className="absolute inset-x-3 bottom-0 h-6 flex">
-                          {/* „pusta” kolumna o szerokości kolumny Y (w-10 mr-2), żeby Z1 nie wchodziło pod wartości Y */}
                           <div className="w-10 mr-2" />
                           <div
                             className="flex-1 grid gap-2 h-full items-start text-center text-[10px] text-gray-500"
                             style={{
-                              gridTemplateColumns: `repeat(${Math.max(
-                                taskBars.length,
-                                1
-                              )}, minmax(0, 1fr))`,
+                              gridTemplateColumns: `repeat(${Math.max(taskBars.length, 1)}, minmax(0, 1fr))`,
                             }}
                           >
                             {taskBars.map((b) => (
@@ -872,79 +756,48 @@ const Results: React.FC = () => {
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="font-bold">Analiza zadań</h3>
                       <div className="text-xs text-gray-400">
-                        p – łatwość, q – trudność, f – frakcja opuszczeń, S² –
-                        wariancja, r – moc różnicująca
+                        p – łatwość, q – trudność, f – frakcja opuszczeń, S² – wariancja, r – moc różnicująca
                       </div>
                     </div>
                     <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
                       <table className="min-w-full ">
                         <thead>
                           <tr>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6 pr-6">
-                              ZAD.
-                            </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
-                              OPIS
-                            </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
-                              ŚR.PKT
-                            </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
-                              p
-                            </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
-                              q
-                            </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
-                              f
-                            </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
-                              S²
-                            </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
-                              r
-                            </th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6 pr-6">ZAD.</th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">OPIS</th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">ŚR.PKT</th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">p</th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">q</th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">f</th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">S²</th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">r</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {overview.items.map((it) => (
-                            <tr
-                              key={it.id}
-                              className="border border-[#ececec] border-width-0.2 transition hover:bg-gray-50" 
-                            >
-                              <td className="py-4 pl-6 pr-6 text-gray-800 font-semibold">
-                                {" "}
-                                {it.order}.{" "}
-                              </td>
-                              <td className="py-4 pr-6 text-gray-700 max-w-[900px] break-words whitespace-pre-wrap">
-                                {it.description}
-                              </td>
-                              <td className="py-4 pr-6 text-gray-800">
-                                {it.avgPoints.toFixed(2)}
-                              </td>
-                              <td className="py-4 pr-6 text-gray-800">
-                                {it.p.toFixed(2)}
-                              </td>
-                              <td className="py-4 pr-6 text-gray-800">
-                                {it.q.toFixed(2)}
-                              </td>
-                              <td className="py-4 pr-6 text-gray-800">
-                                {it.f.toFixed(2)}
-                              </td>
-                              <td className="py-4 pr-6 text-gray-800">
-                                {it.variance.toFixed(2)}
-                              </td>
-                              <td className="py-4 pr-6 text-gray-800">
-                                {it.discrimination.toFixed(2)}
-                              </td>
-                            </tr>
-                          ))}
+                          {overview.items.map((it, idx) => {
+                            const isLast = idx === overview.items.length - 1;
+                            return (
+                              <tr
+                                key={it.id}
+                                className="transition hover:bg-gray-50"
+                                style={{ borderColor: "#ececec", borderWidth: isLast ? 0 : "0.2px" }}
+                              >
+                                <td className="py-4 pl-6 pr-6 text-gray-800 font-semibold">{it.order}.</td>
+                                <td className="py-4 pr-6 text-gray-700 max-w-[900px] break-words whitespace-pre-wrap">
+                                  {it.description}
+                                </td>
+                                <td className="py-4 pr-6 text-gray-800">{it.avgPoints.toFixed(2)}</td>
+                                <td className="py-4 pr-6 text-gray-800">{it.p.toFixed(2)}</td>
+                                <td className="py-4 pr-6 text-gray-800">{it.q.toFixed(2)}</td>
+                                <td className="py-4 pr-6 text-gray-800">{it.f.toFixed(2)}</td>
+                                <td className="py-4 pr-6 text-gray-800">{it.variance.toFixed(2)}</td>
+                                <td className="py-4 pr-6 text-gray-800">{it.discrimination.toFixed(2)}</td>
+                              </tr>
+                            );
+                          })}
                           {overview.items.length === 0 && (
                             <tr>
-                              <td
-                                colSpan={8}
-                                className="py-8 text-center text-gray-400"
-                              >
+                              <td colSpan={8} className="py-8 text-center text-gray-400">
                                 Brak zadań.
                               </td>
                             </tr>
@@ -956,7 +809,7 @@ const Results: React.FC = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-6">
-                  {/* Wykres (uczniowie wg Lp.) */}
+                  {/* Wykres (uczniowie) */}
                   <div className="bg-white rounded-xl shadow-md p-4">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-3">
                       <h3 className="font-bold">Wykres (uczniowie)</h3>
@@ -972,22 +825,13 @@ const Results: React.FC = () => {
                           <select
                             className="border border-gray-300 rounded-lg px-3 pr-8 py-1.5 bg-white text-sm focus:outline-none focus:border-teal-400 appearance-none"
                             value={studentMetric}
-                            onChange={(e) =>
-                              setStudentMetric(e.target.value as StudentMetric)
-                            }
+                            onChange={(e) => setStudentMetric(e.target.value as StudentMetric)}
                           >
                             <option value="percent">% wyniku</option>
                             <option value="points">Suma punktów</option>
                           </select>
                           <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-gray-500">
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                            >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <path d="M6 9l6 6 6-6" />
                             </svg>
                           </span>
@@ -995,10 +839,7 @@ const Results: React.FC = () => {
                       </div>
                     </div>
 
-                    <div
-                      className="grid"
-                      style={{ gridTemplateColumns: "8px 1fr" }}
-                    >
+                    <div className="grid" style={{ gridTemplateColumns: "8px 1fr" }}>
                       {/* Tytuł osi Y */}
                       <div className="relative h-74">
                         <div className="absolute inset-0 flex items-center justify-center pl-[4px]">
@@ -1010,10 +851,9 @@ const Results: React.FC = () => {
 
                       {/* Pudełko wykresu */}
                       <div className="relative h-74 rounded-lg">
-                        {/* Obszar roboczy (rezerwa na X-etykiety) */}
                         <div className="absolute inset-x-3 top-3 bottom-6">
                           <div className="relative h-full flex">
-                            {/* Wartości osi Y – idealnie na liniach (ten sam fix co wcześniej) */}
+                            {/* Wartości osi Y */}
                             <div className="relative w-10 mr-2">
                               {yAxisStudents.ticks.map((t) => {
                                 const pct = yAxisStudents.toPct(t);
@@ -1022,37 +862,24 @@ const Results: React.FC = () => {
                                   <div
                                     key={String(t)}
                                     className="absolute left-0 text-[10px] leading-[10px] text-gray-400 text-right w-full pr-1 pointer-events-none select-none"
-                                    style={
-                                      isZero
-                                        ? {
-                                            bottom: 0,
-                                            transform: "translateY(1px)",
-                                          }
-                                        : { bottom: `calc(${pct}% - 3px)` }
-                                    }
+                                    style={isZero ? { bottom: 0, transform: "translateY(1px)" } : { bottom: `calc(${pct}% - 3px)` }}
                                   >
-                                    {yAxisStudents.format(
-                                      typeof t === "number" ? t : Number(t)
-                                    )}
+                                    {yAxisStudents.format(typeof t === "number" ? t : Number(t))}
                                   </div>
                                 );
                               })}
                             </div>
 
-                            {/* Linie pomocnicze + słupki */}
+                            {/* Linie + słupki */}
                             <div className="relative flex-1">
                               {yAxisStudents.ticks.map((t) => (
                                 <div
                                   key={`g-${String(t)}`}
                                   className="absolute left-0 right-0"
                                   style={{
-                                    bottom: `${yAxisStudents.toPct(
-                                      typeof t === "number" ? t : Number(t)
-                                    )}%`,
+                                    bottom: `${yAxisStudents.toPct(typeof t === "number" ? t : Number(t))}%`,
                                     borderTop:
-                                      yAxisStudents.toPct(
-                                        typeof t === "number" ? t : Number(t)
-                                      ) === 0
+                                      yAxisStudents.toPct(typeof t === "number" ? t : Number(t)) === 0
                                         ? "2px solid #e5e7eb"
                                         : "1px dashed #eee",
                                   }}
@@ -1062,36 +889,20 @@ const Results: React.FC = () => {
                               <div
                                 className="relative h-full grid gap-2"
                                 style={{
-                                  gridTemplateColumns: `repeat(${Math.max(
-                                    studentBars.length,
-                                    1
-                                  )}, minmax(0, 1fr))`,
+                                  gridTemplateColumns: `repeat(${Math.max(studentBars.length, 1)}, minmax(0, 1fr))`,
                                 }}
                               >
                                 {studentBars.map((b) => (
-                                  <div
-                                    key={b.lp}
-                                    className="flex flex-col items-center justify-end"
-                                  >
+                                  <div key={b.lp} className="flex flex-col items-center justify-end">
                                     <div className="relative h-full w-full flex items-end">
                                       <div
                                         className="w-full max-w-[22px] mx-auto bg-teal-400 rounded-t"
-                                        style={{
-                                          height: `${Math.max(
-                                            0,
-                                            Math.min(100, b.value)
-                                          )}%`,
-                                        }}
+                                        style={{ height: `${Math.max(0, Math.min(100, b.value))}%` }}
                                         title={b.tooltip}
                                       />
                                       <div
                                         className="absolute left-1/2 -translate-x-1/2 text-[10px] text-gray-600"
-                                        style={{
-                                          bottom: `calc(${Math.max(
-                                            0,
-                                            Math.min(100, b.value)
-                                          )}% + 4px)`,
-                                        }}
+                                        style={{ bottom: `calc(${Math.max(0, Math.min(100, b.value))}% + 4px)` }}
                                       >
                                         {b.label}
                                       </div>
@@ -1102,18 +913,13 @@ const Results: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                        {/* Oś X (Lp.) – wyrównana do słupków: lewy spacer = szerokość osi Y */}
+
+                        {/* Oś X (Lp.) */}
                         <div className="absolute inset-x-3 bottom-0 h-6 flex">
-                          {/* lewy spacer = tyle, co kolumna z wartościami osi Y (w-10 mr-2) */}
                           <div className="w-10 mr-2" />
                           <div
                             className="flex-1 grid gap-2 h-full items-start text-center text-[10px] text-gray-500"
-                            style={{
-                              gridTemplateColumns: `repeat(${Math.max(
-                                studentBars.length,
-                                1
-                              )}, minmax(0, 1fr))`,
-                            }}
+                            style={{ gridTemplateColumns: `repeat(${Math.max(studentBars.length, 1)}, minmax(0, 1fr))` }}
                           >
                             {studentBars.map((b) => (
                               <div key={b.lp}>{b.lp}</div>
@@ -1131,61 +937,42 @@ const Results: React.FC = () => {
                   <div className="bg-white rounded-xl shadow-md p-4">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="font-bold">Wyniki uczniów</h3>
-                      <div className="text-xs text-gray-400">
-                        Maks: {overview.header.totalMax} pkt
-                      </div>
+                      <div className="text-xs text-gray-400">Maks: {overview.header.totalMax} pkt</div>
                     </div>
 
                     <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
                       <table className="min-w-full">
                         <thead>
                           <tr>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6 pr-6">
-                              Lp.
-                            </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
-                              Uczeń
-                            </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
-                              Klasa
-                            </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
-                              Suma
-                            </th>
-                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
-                              Wynik(%)
-                            </th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6 pr-6">Lp.</th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">Uczeń</th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">Klasa</th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">Suma</th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">Wynik(%)</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {overview.students.map((r, idx) => (
-                            <tr
-                              key={r.studentId}
-                              className="border border-[#ececec] border-width-0.2 transition hover:bg-gray-50"
-                            >
-                              <td className="py-4 pl-6 pr-6 text-gray-800 font-semibold">
-                                {idx + 1}
-                              </td>
-                              <td className="py-4 pr-6 text-gray-800 font-semibold break-words">
-                                {r.firstName} {r.lastName}
-                              </td>
-                              <td className="py-4 pr-6 text-gray-700">
-                                {r.className || "-"}
-                              </td>
-                              <td className="py-4 pr-6 text-gray-800">
-                                {r.total.toFixed(2)}
-                              </td>
-                              <td className="py-4 pr-6 text-gray-800">
-                                {(r.percent * 100).toFixed(0)}%
-                              </td>
-                            </tr>
-                          ))}
+                          {overview.students.map((r, idx) => {
+                            const isLast = idx === overview.students.length - 1;
+                            return (
+                              <tr
+                                key={r.studentId}
+                                className="transition hover:bg-gray-50"
+                                style={{ borderColor: "#ececec", borderWidth: isLast ? 0 : "0.2px" }}
+                              >
+                                <td className="py-4 pl-6 pr-6 text-gray-800 font-semibold">{idx + 1}</td>
+                                <td className="py-4 pr-6 text-gray-800 font-semibold break-words">
+                                  {r.firstName} {r.lastName}
+                                </td>
+                                <td className="py-4 pr-6 text-gray-700">{r.className || "-"}</td>
+                                <td className="py-4 pr-6 text-gray-800">{r.total.toFixed(2)}</td>
+                                <td className="py-4 pr-6 text-gray-800">{(r.percent * 100).toFixed(0)}%</td>
+                              </tr>
+                            );
+                          })}
                           {overview.students.length === 0 && (
                             <tr>
-                              <td
-                                colSpan={5}
-                                className="py-8 text-center text-gray-400"
-                              >
+                              <td colSpan={5} className="py-8 text-center text-gray-400">
                                 Brak uczniów.
                               </td>
                             </tr>
@@ -1198,40 +985,29 @@ const Results: React.FC = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4 text-sm text-gray-700">
                       <div className="bg-[#f7fafc] rounded-lg p-3">
                         <div className="text-xs text-gray-400">Średnia</div>
-                        <div className="font-semibold">
-                          {overview.summary.mean.toFixed(2)}
-                        </div>
+                        <div className="font-semibold">{overview.summary.mean.toFixed(2)}</div>
                       </div>
                       <div className="bg-[#f7fafc] rounded-lg p-3">
                         <div className="text-xs text-gray-400">Mediana</div>
-                        <div className="font-semibold">
-                          {overview.summary.median.toFixed(2)}
-                        </div>
+                        <div className="font-semibold">{overview.summary.median.toFixed(2)}</div>
                       </div>
                       <div className="bg-[#f7fafc] rounded-lg p-3">
                         <div className="text-xs text-gray-400">Moda</div>
-                        <div className="font-semibold">
-                          {overview.summary.mode ?? "—"}
-                        </div>
+                        <div className="font-semibold">{overview.summary.mode ?? "—"}</div>
                       </div>
                       <div className="bg-[#f7fafc] rounded-lg p-3">
                         <div className="text-xs text-gray-400">Min / Max</div>
                         <div className="font-semibold">
-                          {overview.summary.min.toFixed(2)} /{" "}
-                          {overview.summary.max.toFixed(2)}
+                          {overview.summary.min.toFixed(2)} / {overview.summary.max.toFixed(2)}
                         </div>
                       </div>
                       <div className="bg-[#f7fafc] rounded-lg p-3">
                         <div className="text-xs text-gray-400">Rozstęp</div>
-                        <div className="font-semibold">
-                          {overview.summary.range.toFixed(2)}
-                        </div>
+                        <div className="font-semibold">{overview.summary.range.toFixed(2)}</div>
                       </div>
                       <div className="bg-[#f7fafc] rounded-lg p-3">
                         <div className="text-xs text-gray-400">Wariancja</div>
-                        <div className="font-semibold">
-                          {overview.summary.variance.toFixed(2)}
-                        </div>
+                        <div className="font-semibold">{overview.summary.variance.toFixed(2)}</div>
                       </div>
                     </div>
                   </div>
