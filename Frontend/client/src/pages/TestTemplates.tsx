@@ -31,8 +31,17 @@ const snapByRule = (v: number, halves: boolean) =>
   halves ? Math.round(v * 2) / 2 : Math.round(v);
 
 const parseBool = (v: any) => {
-  const s = String(v ?? "").trim().toLowerCase();
-  return s === "true" || s === "1" || s === "t" || s === "tak" || s === "y" || s === "yes";
+  const s = String(v ?? "")
+    .trim()
+    .toLowerCase();
+  return (
+    s === "true" ||
+    s === "1" ||
+    s === "t" ||
+    s === "tak" ||
+    s === "y" ||
+    s === "yes"
+  );
 };
 
 const safeFilename = (name: string) =>
@@ -382,19 +391,28 @@ const TestTemplates: React.FC = () => {
         const description = String(r.Description || r.Task || "").trim();
         const minRaw = Number(r.MinPoints ?? r.Min ?? 0);
         const maxRaw = Number(r.MaxPoints ?? r.Max ?? 1);
-        const allowHalfPoints = parseBool(r.AllowHalfPoints ?? r.Halves ?? true);
+        const allowHalfPoints = parseBool(
+          r.AllowHalfPoints ?? r.Halves ?? true
+        );
 
         const halves = !!allowHalfPoints;
-        const minPoints = snapByRule(Number.isFinite(minRaw) ? minRaw : 0, halves);
+        const minPoints = snapByRule(
+          Number.isFinite(minRaw) ? minRaw : 0,
+          halves
+        );
         const maxPoints = snapByRule(
-          Number.isFinite(maxRaw) ? Math.max(maxRaw, minPoints) : Math.max(1, minPoints),
+          Number.isFinite(maxRaw)
+            ? Math.max(maxRaw, minPoints)
+            : Math.max(1, minPoints),
           halves
         );
 
         const arr = groups.get(name) ?? [];
         arr.push({
           order:
-            Number.isFinite(orderRaw) && orderRaw > 0 ? orderRaw : arr.length + 1,
+            Number.isFinite(orderRaw) && orderRaw > 0
+              ? orderRaw
+              : arr.length + 1,
           description,
           minPoints,
           maxPoints,
@@ -455,10 +473,10 @@ const TestTemplates: React.FC = () => {
 
       await fetchTemplates();
       push({
-        type: (fail || skippedDuplicates) ? "error" : "success",
+        type: fail || skippedDuplicates ? "error" : "success",
         message:
           `Zaimportowano ${ok} szablon(y).` +
-          (skippedDuplicates ? ` Nazwa szablonu już istnieje.`: "") +
+          (skippedDuplicates ? ` Nazwa szablonu już istnieje.` : "") +
           (fail ? ` Błędy: ${fail}.` : ""),
       });
     } catch {
@@ -539,86 +557,9 @@ const TestTemplates: React.FC = () => {
             </div>
           </div>
 
-          {/* Lista szablonów */}
-          {loading ? (
-            <div>Ładowanie...</div>
-          ) : templates.length === 0 ? (
-            <div className="mt-7 text-gray-400">Brak szablonów testów.</div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {templates.map((template) => (
-                <div
-                  key={template.id}
-                  className="bg-white rounded-xl shadow p-5 flex flex-col gap-3"
-                >
-                  <div className="flex-1">
-                    <span className="font-bold text-lg">{template.name}</span>
-                    <div className="mt-2">
-                      {template.tasks.length === 0 ? (
-                        <div className="text-gray-400 text-sm">Brak zadań</div>
-                      ) : (
-                        template.tasks.map((task, idx) => (
-                          <div key={task.id || idx} className="text-sm my-1">
-                            <span className="font-semibold">
-                              Zadanie {idx + 1}.
-                            </span>{" "}
-                            {task.description}{" "}
-                            <span className="text-xs text-gray-400">
-                              ({task.minPoints}-{task.maxPoints} pkt,{" "}
-                              {task.allowHalfPoints ? "połówki: TAK" : "połówki: NIE"}
-                              )
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 justify-end self-end">
-                    <button
-                      className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
-                      onClick={() => openEdit(template)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
-                      onClick={() => handleDeleteTemplate(template.id)}
-                    >
-                      Delete
-                    </button>
-
-                    {/* Ikonowy przycisk eksportu */}
-                    <button
-                      className="p-2 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-300 transition group"
-                      onClick={() => exportOneTemplateXlsx(template)}
-                      type="button"
-                      title="Eksportuj ten szablon"
-                      aria-label="Eksportuj ten szablon"
-                    >
-  <svg
-    className="w-5 h-5 text-gray-600 group-hover:text-gray-800"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M12 3v10" />
-    <path d="M8.5 6.5 12 3l3.5 3.5" />
-    <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
-  </svg>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Formularz DODAWANIA */}
           {showAddForm && (
-            <div className="bg-white rounded-xl shadow-md p-6 mt-8">
+            <div className="bg-white rounded-xl shadow-md p-6">
               <h3 className="text-lg font-bold mb-4">Nowy szablon testu</h3>
               <form onSubmit={handleAddSubmit}>
                 <label className="block mb-2 font-semibold">
@@ -797,6 +738,84 @@ const TestTemplates: React.FC = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          )}
+          {/* Lista szablonów */}
+          {loading ? (
+            <div>Ładowanie...</div>
+          ) : templates.length === 0 ? (
+            <div className="mt-7 text-gray-400">Brak szablonów testów.</div>
+          ) : (
+            <div className="flex flex-col gap-4 mt-8">
+              {templates.map((template) => (
+                <div
+                  key={template.id}
+                  className="bg-white rounded-xl shadow p-5 flex flex-col gap-3"
+                >
+                  <div className="flex-1">
+                    <span className="font-bold text-lg">{template.name}</span>
+                    <div className="mt-2">
+                      {template.tasks.length === 0 ? (
+                        <div className="text-gray-400 text-sm">Brak zadań</div>
+                      ) : (
+                        template.tasks.map((task, idx) => (
+                          <div key={task.id || idx} className="text-sm my-1">
+                            <span className="font-semibold">
+                              Zadanie {idx + 1}.
+                            </span>{" "}
+                            {task.description}{" "}
+                            <span className="text-xs text-gray-400">
+                              ({task.minPoints}-{task.maxPoints} pkt,{" "}
+                              {task.allowHalfPoints
+                                ? "połówki: TAK"
+                                : "połówki: NIE"}
+                              )
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 justify-end self-end">
+                    <button
+                      className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
+                      onClick={() => openEdit(template)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
+                      onClick={() => handleDeleteTemplate(template.id)}
+                    >
+                      Delete
+                    </button>
+
+                    {/* Ikonowy przycisk eksportu */}
+                    <button
+                      className="p-2 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-300 transition group"
+                      onClick={() => exportOneTemplateXlsx(template)}
+                      type="button"
+                      title="Eksportuj ten szablon"
+                      aria-label="Eksportuj ten szablon"
+                    >
+                      <svg
+                        className="w-5 h-5 text-gray-600 group-hover:text-gray-800"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M12 3v10" />
+                        <path d="M8.5 6.5 12 3l3.5 3.5" />
+                        <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
