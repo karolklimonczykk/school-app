@@ -61,17 +61,20 @@ router.delete("/:id", authenticateJWT, async (req, res) => {
 // POST: dodaj zadanie do szablonu
 router.post("/:templateId/tasks", authenticateJWT, async (req, res) => {
   const templateId = Number(req.params.templateId);
-  const { description, order, minPoints, maxPoints, allowHalfPoints } =
-    req.body;
+  const { name, activity, content, order, minPoints, maxPoints, allowHalfPoints } = req.body;
 
-  if (!description) {
-    res.status(400).json({ error: "Brak opisu" });
+  if (!content) {
+    res.status(400).json({ error: "Treść zadania (content) jest wymagana" });
     return;
   }
+
   const half = allowHalfPoints !== false;
+
   const task = await prisma.testTask.create({
     data: {
-      description,
+      name: name ?? null,
+      activity: activity ?? null,
+      content,
       order,
       minPoints,
       maxPoints,
@@ -85,11 +88,20 @@ router.post("/:templateId/tasks", authenticateJWT, async (req, res) => {
 // PUT: edytuj zadanie
 router.put("/:templateId/tasks/:taskId", authenticateJWT, async (req, res) => {
   const taskId = Number(req.params.taskId);
-  const { description, order, minPoints, maxPoints, allowHalfPoints } = req.body;
-   const half = allowHalfPoints !== false;
+  const { name, activity, content, order, minPoints, maxPoints, allowHalfPoints } = req.body;
+  const half = allowHalfPoints !== false;
+
   const updated = await prisma.testTask.update({
     where: { id: taskId },
-    data: { description, order, minPoints, maxPoints, allowHalfPoints },
+    data: {
+      name: name ?? null,
+      activity: activity ?? null,
+      content,
+      order,
+      minPoints,
+      maxPoints,
+      allowHalfPoints: half,
+    },
   });
   res.json(updated);
 });

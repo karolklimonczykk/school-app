@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* src/pages/TestTemplates.tsx */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useRef, useState } from "react";
 import Sidebar from "../components/Sidebar/Sidebar";
@@ -5,21 +7,19 @@ import axios from "axios";
 import * as XLSX from "xlsx";
 import { useToast } from "../components/Toast";
 
-// --- Typy (bez kategorii) ---
+// --- Typy ---
 type TaskDraft = {
-  description: string;
+  id?: number;
+  order: number;
+  name?: string;
+  activity?: string;
+  content: string;
   minPoints: number;
   maxPoints: number;
   allowHalfPoints: boolean;
 };
 
-type TaskView = {
-  id?: number;
-  description: string;
-  minPoints: number;
-  maxPoints: number;
-  allowHalfPoints: boolean;
-};
+type TaskView = TaskDraft & { id: number };
 
 type TestTemplate = {
   id: number;
@@ -31,9 +31,7 @@ const snapByRule = (v: number, halves: boolean) =>
   halves ? Math.round(v * 2) / 2 : Math.round(v);
 
 const parseBool = (v: any) => {
-  const s = String(v ?? "")
-    .trim()
-    .toLowerCase();
+  const s = String(v ?? "").trim().toLowerCase();
   return (
     s === "true" ||
     s === "1" ||
@@ -47,6 +45,17 @@ const parseBool = (v: any) => {
 const safeFilename = (name: string) =>
   name.replace(/[\\/:*?"<>|]/g, "_").slice(0, 120);
 
+// --- helpers: renumeracja i przenoszenie elementu w tablicy ---
+const renumber = <T extends TaskDraft>(arr: T[]) =>
+  arr.map((t, i) => ({ ...t, order: i + 1 }));
+
+const moveItem = <T,>(arr: T[], from: number, to: number) => {
+  const a = arr.slice();
+  const [moved] = a.splice(from, 1);
+  a.splice(to, 0, moved);
+  return a;
+};
+
 const TestTemplates: React.FC = () => {
   const { push } = useToast();
 
@@ -58,7 +67,15 @@ const TestTemplates: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [addName, setAddName] = useState("");
   const [addTasks, setAddTasks] = useState<TaskDraft[]>([
-    { description: "", minPoints: 0, maxPoints: 1, allowHalfPoints: true },
+    {
+      order: 1,
+      name: "",
+      activity: "",
+      content: "",
+      minPoints: 0,
+      maxPoints: 1,
+      allowHalfPoints: true,
+    },
   ]);
 
   // --- Edycja (MODAL) ---
@@ -66,8 +83,22 @@ const TestTemplates: React.FC = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [editTasks, setEditTasks] = useState<TaskDraft[]>([
-    { description: "", minPoints: 0, maxPoints: 1, allowHalfPoints: true },
+    {
+      order: 1,
+      name: "",
+      activity: "",
+      content: "",
+      minPoints: 0,
+      maxPoints: 1,
+      allowHalfPoints: true,
+    },
   ]);
+
+  // --- DnD stany (ADD/EDIT) ---
+  const [draggingAdd, setDraggingAdd] = useState<number | null>(null);
+  const [overAdd, setOverAdd] = useState<number | null>(null);
+  const [draggingEdit, setDraggingEdit] = useState<number | null>(null);
+  const [overEdit, setOverEdit] = useState<number | null>(null);
 
   // --- Import XLSX (ref do file input) ---
   const importFileRef = useRef<HTMLInputElement | null>(null);
@@ -86,7 +117,25 @@ const TestTemplates: React.FC = () => {
       const res = await axios.get("/test-templates", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setTemplates(Array.isArray(res.data) ? res.data : []);
+      const list: TestTemplate[] = (Array.isArray(res.data) ? res.data : []).map(
+        (t: any) => ({
+          id: t.id,
+          name: t.name,
+          tasks: (t.tasks || [])
+            .map((x: any) => ({
+              id: x.id,
+              order: Number(x.order ?? 0) || 0,
+              name: x.name ?? "",
+              activity: x.activity ?? "",
+              content: x.content ?? "",
+              minPoints: Number(x.minPoints ?? 0),
+              maxPoints: Number(x.maxPoints ?? 0),
+              allowHalfPoints: Boolean(x.allowHalfPoints ?? true),
+            }))
+            .sort((a: TaskView, b: TaskView) => a.order - b.order),
+        })
+      );
+      setTemplates(list);
     } catch {
       setTemplates([]);
       push({ type: "error", message: "Błąd pobierania szablonów." });
@@ -101,7 +150,15 @@ const TestTemplates: React.FC = () => {
   const resetAddForm = () => {
     setAddName("");
     setAddTasks([
-      { description: "", minPoints: 0, maxPoints: 1, allowHalfPoints: true },
+      {
+        order: 1,
+        name: "",
+        activity: "",
+        content: "",
+        minPoints: 0,
+        maxPoints: 1,
+        allowHalfPoints: true,
+      },
     ]);
   };
 
@@ -109,7 +166,15 @@ const TestTemplates: React.FC = () => {
     setEditingId(null);
     setEditName("");
     setEditTasks([
-      { description: "", minPoints: 0, maxPoints: 1, allowHalfPoints: true },
+      {
+        order: 1,
+        name: "",
+        activity: "",
+        content: "",
+        minPoints: 0,
+        maxPoints: 1,
+        allowHalfPoints: true,
+      },
     ]);
   };
 
@@ -153,7 +218,9 @@ const TestTemplates: React.FC = () => {
         const rt = await axios.post(
           `/test-templates/${templateId}/tasks`,
           {
-            description: t.description,
+            name: t.name || null,
+            activity: t.activity || null,
+            content: t.content,
             order: order + 1,
             minPoints: t.minPoints,
             maxPoints: t.maxPoints,
@@ -167,7 +234,11 @@ const TestTemplates: React.FC = () => {
       // 3) Aktualizujemy lokalny stan listy
       setTemplates((prev) => [
         ...prev,
-        { id: templateId, name: addName, tasks: createdTasks },
+        {
+          id: templateId,
+          name: addName,
+          tasks: createdTasks.sort((a, b) => a.order - b.order),
+        },
       ]);
 
       // 4) Sprzątamy
@@ -187,15 +258,24 @@ const TestTemplates: React.FC = () => {
     setEditName(tpl.name);
     setEditTasks(
       tpl.tasks.length
-        ? tpl.tasks.map((t) => ({
-            description: t.description,
-            minPoints: t.minPoints,
-            maxPoints: t.maxPoints,
-            allowHalfPoints: t.allowHalfPoints ?? true,
-          }))
+        ? tpl.tasks
+            .map((t) => ({
+              id: t.id,
+              order: t.order,
+              name: t.name ?? "",
+              activity: t.activity ?? "",
+              content: t.content ?? "",
+              minPoints: t.minPoints,
+              maxPoints: t.maxPoints,
+              allowHalfPoints: t.allowHalfPoints ?? true,
+            }))
+            .sort((a, b) => a.order - b.order)
         : [
             {
-              description: "",
+              order: 1,
+              name: "",
+              activity: "",
+              content: "",
               minPoints: 0,
               maxPoints: 1,
               allowHalfPoints: true,
@@ -226,18 +306,19 @@ const TestTemplates: React.FC = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // 2) Zadania: aktualizacja / dodanie / usunięcie
+      // 2) Zadania: aktualizacja / dodanie / usunięcie (po ID, nie po pozycji!)
       const prevTpl = templates.find((t) => t.id === editingId)!;
+      const remainingToDelete = new Set(prevTpl.tasks.map((t) => t.id));
 
       const newTaskViews: TaskView[] = [];
       for (const [order, t] of editTasks.entries()) {
-        if (prevTpl.tasks[order]) {
-          // update istniejącego
-          const taskId = prevTpl.tasks[order].id!;
-          await axios.put(
-            `/test-templates/${editingId}/tasks/${taskId}`,
+        if (t.id) {
+          const rt = await axios.put(
+            `/test-templates/${editingId}/tasks/${t.id}`,
             {
-              description: t.description,
+              name: t.name || null,
+              activity: t.activity || null,
+              content: t.content,
               order: order + 1,
               minPoints: t.minPoints,
               maxPoints: t.maxPoints,
@@ -245,13 +326,15 @@ const TestTemplates: React.FC = () => {
             },
             { headers: { Authorization: `Bearer ${token}` } }
           );
-          newTaskViews.push({ ...prevTpl.tasks[order], ...t });
+          newTaskViews.push(rt.data);
+          remainingToDelete.delete(t.id);
         } else {
-          // nowy
           const rt = await axios.post(
             `/test-templates/${editingId}/tasks`,
             {
-              description: t.description,
+              name: t.name || null,
+              activity: t.activity || null,
+              content: t.content,
               order: order + 1,
               minPoints: t.minPoints,
               maxPoints: t.maxPoints,
@@ -263,20 +346,23 @@ const TestTemplates: React.FC = () => {
         }
       }
 
-      // usuń nadmiarowe z końca
-      if (prevTpl.tasks.length > editTasks.length) {
-        for (let i = editTasks.length; i < prevTpl.tasks.length; i++) {
-          const tid = prevTpl.tasks[i].id!;
-          await axios.delete(`/test-templates/${editingId}/tasks/${tid}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-        }
+      // Usuń te, których nie ma już w nowej liście
+      for (const tid of remainingToDelete) {
+        await axios.delete(`/test-templates/${editingId}/tasks/${tid}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
       }
 
       // 3) Zaktualizuj listę
       setTemplates((prev) =>
         prev.map((t) =>
-          t.id === editingId ? { ...t, name: editName, tasks: newTaskViews } : t
+          t.id === editingId
+            ? {
+                ...t,
+                name: editName,
+                tasks: newTaskViews.sort((a, b) => a.order - b.order),
+              }
+            : t
         )
       );
 
@@ -323,16 +409,20 @@ const TestTemplates: React.FC = () => {
             {
               TemplateName: tpl.name,
               TaskOrder: "",
-              Description: "",
+              Name: "",
+              Activity: "",
+              Content: "",
               MinPoints: "",
               MaxPoints: "",
               AllowHalfPoints: "TRUE",
             },
           ]
-        : tpl.tasks.map((task, idx) => ({
+        : tpl.tasks.map((task) => ({
             TemplateName: tpl.name,
-            TaskOrder: idx + 1,
-            Description: task.description,
+            TaskOrder: task.order,
+            Name: task.name || "",
+            Activity: task.activity || "",
+            Content: task.content,
             MinPoints: task.minPoints,
             MaxPoints: task.maxPoints,
             AllowHalfPoints: task.allowHalfPoints ? "TRUE" : "FALSE",
@@ -342,7 +432,9 @@ const TestTemplates: React.FC = () => {
       header: [
         "TemplateName",
         "TaskOrder",
-        "Description",
+        "Name",
+        "Activity",
+        "Content",
         "MinPoints",
         "MaxPoints",
         "AllowHalfPoints",
@@ -355,7 +447,7 @@ const TestTemplates: React.FC = () => {
   };
 
   // ---------------------------------
-  // XLSX — IMPORT SZABLONÓW (walidacja nazw)
+  // XLSX — IMPORT SZABLONÓW
   // ---------------------------------
   const handleImportXlsx: React.ChangeEventHandler<HTMLInputElement> = async (
     e
@@ -374,7 +466,9 @@ const TestTemplates: React.FC = () => {
         string,
         {
           order: number;
-          description: string;
+          name?: string;
+          activity?: string;
+          content: string;
           minPoints: number;
           maxPoints: number;
           allowHalfPoints: boolean;
@@ -382,13 +476,15 @@ const TestTemplates: React.FC = () => {
       >();
 
       for (const r of rows) {
-        const name = String(
+        const tplName = String(
           r.TemplateName || r["Template Name"] || r.Template || ""
         ).trim();
-        if (!name) continue;
+        if (!tplName) continue;
 
         const orderRaw = Number(r.TaskOrder || r.Order || r["Task #"] || 0);
-        const description = String(r.Description || r.Task || "").trim();
+        const name = String(r.Name ?? "").trim();
+        const activity = String(r.Activity ?? "").trim();
+        const content = String(r.Content ?? r.Description ?? "").trim();
         const minRaw = Number(r.MinPoints ?? r.Min ?? 0);
         const maxRaw = Number(r.MaxPoints ?? r.Max ?? 1);
         const allowHalfPoints = parseBool(
@@ -407,18 +503,20 @@ const TestTemplates: React.FC = () => {
           halves
         );
 
-        const arr = groups.get(name) ?? [];
+        const arr = groups.get(tplName) ?? [];
         arr.push({
           order:
             Number.isFinite(orderRaw) && orderRaw > 0
               ? orderRaw
               : arr.length + 1,
-          description,
+          name,
+          activity,
+          content,
           minPoints,
           maxPoints,
           allowHalfPoints: halves,
         });
-        groups.set(name, arr);
+        groups.set(tplName, arr);
       }
 
       const token = localStorage.getItem("token");
@@ -432,7 +530,6 @@ const TestTemplates: React.FC = () => {
 
       for (const [tplName, list] of groups) {
         const nameKey = tplName.trim().toLowerCase();
-        // twarda walidacja: nazwa już istnieje -> pomijamy cały szablon
         if (!tplName || existingNames.has(nameKey)) {
           skippedDuplicates++;
           continue;
@@ -454,7 +551,9 @@ const TestTemplates: React.FC = () => {
             await axios.post(
               `/test-templates/${templateId}/tasks`,
               {
-                description: t.description,
+                name: t.name || null,
+                activity: t.activity || null,
+                content: t.content,
                 order: i + 1,
                 minPoints: t.minPoints,
                 maxPoints: Math.max(t.maxPoints, t.minPoints),
@@ -487,35 +586,123 @@ const TestTemplates: React.FC = () => {
   };
 
   // ---------------------------------
-  // Helpers UI (dodawanie/edycja zadań)
+  // Helpers UI (dodawanie/edycja zadań) + DnD
   // ---------------------------------
+  // ADD
   const addAddTask = () =>
-    setAddTasks((s) => [
-      ...s,
-      { description: "", minPoints: 0, maxPoints: 1, allowHalfPoints: true },
-    ]);
+    setAddTasks((s) =>
+      renumber([
+        ...s,
+        {
+          order: s.length + 1,
+          name: "",
+          activity: "",
+          content: "",
+          minPoints: 0,
+          maxPoints: 1,
+          allowHalfPoints: true,
+        },
+      ])
+    );
 
   const removeAddTask = (idx: number) =>
-    setAddTasks((s) => (s.length === 1 ? s : s.filter((_, i) => i !== idx)));
+    setAddTasks((s) =>
+      s.length === 1 ? s : renumber(s.filter((_, i) => i !== idx))
+    );
 
   const updateAddTask = (idx: number, key: keyof TaskDraft, value: any) =>
-    setAddTasks((s) =>
-      s.map((t, i) => (i === idx ? { ...t, [key]: value } : t))
-    );
+    setAddTasks((s) => {
+      const a = s.map((t, i) => (i === idx ? { ...t, [key]: value } : t));
+      if (key === "order") {
+        const desired = Math.max(1, Math.round(Number(value) || 1));
+        const clamped = Math.min(desired, a.length);
+        const current = a[idx];
+        const without = a.filter((_, i) => i !== idx);
+        without.splice(clamped - 1, 0, current);
+        return renumber(without);
+      }
+      return a;
+    });
 
+  const onAddDragStart = (idx: number, e: React.DragEvent) => {
+    setDraggingAdd(idx);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(idx));
+  };
+  const onAddDragOver = (idx: number, e: React.DragEvent) => {
+    e.preventDefault();
+    setOverAdd(idx);
+    e.dataTransfer.dropEffect = "move";
+  };
+  const onAddDrop = (idx: number, e: React.DragEvent) => {
+    e.preventDefault();
+    const from = Number(e.dataTransfer.getData("text/plain"));
+    setAddTasks((s) => renumber(moveItem(s, from, idx)));
+    setDraggingAdd(null);
+    setOverAdd(null);
+  };
+  const onAddDragEnd = () => {
+    setDraggingAdd(null);
+    setOverAdd(null);
+  };
+
+  // EDIT
   const addEditTask = () =>
-    setEditTasks((s) => [
-      ...s,
-      { description: "", minPoints: 0, maxPoints: 1, allowHalfPoints: true },
-    ]);
+    setEditTasks((s) =>
+      renumber([
+        ...s,
+        {
+          order: s.length + 1,
+          name: "",
+          activity: "",
+          content: "",
+          minPoints: 0,
+          maxPoints: 1,
+          allowHalfPoints: true,
+        },
+      ])
+    );
 
   const removeEditTask = (idx: number) =>
-    setEditTasks((s) => (s.length === 1 ? s : s.filter((_, i) => i !== idx)));
+    setEditTasks((s) =>
+      s.length === 1 ? s : renumber(s.filter((_, i) => i !== idx))
+    );
 
   const updateEditTask = (idx: number, key: keyof TaskDraft, value: any) =>
-    setEditTasks((s) =>
-      s.map((t, i) => (i === idx ? { ...t, [key]: value } : t))
-    );
+    setEditTasks((s) => {
+      const a = s.map((t, i) => (i === idx ? { ...t, [key]: value } : t));
+      if (key === "order") {
+        const desired = Math.max(1, Math.round(Number(value) || 1));
+        const clamped = Math.min(desired, a.length);
+        const current = a[idx];
+        const without = a.filter((_, i) => i !== idx);
+        without.splice(clamped - 1, 0, current);
+        return renumber(without);
+      }
+      return a;
+    });
+
+  const onEditDragStart = (idx: number, e: React.DragEvent) => {
+    setDraggingEdit(idx);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(idx));
+  };
+  const onEditDragOver = (idx: number, e: React.DragEvent) => {
+    e.preventDefault();
+    setOverEdit(idx);
+    e.dataTransfer.dropEffect = "move";
+  };
+  const onEditDrop = (idx: number, e: React.DragEvent) => {
+    e.preventDefault();
+    const from = Number(e.dataTransfer.getData("text/plain"));
+    setEditTasks((s) => renumber(moveItem(s, from, idx)));
+    setDraggingEdit(null);
+    setOverEdit(null);
+  };
+  const onEditDragEnd = () => {
+    setDraggingEdit(null);
+    setOverEdit(null);
+  };
 
   // ---------------------------------
   // Render
@@ -525,7 +712,7 @@ const TestTemplates: React.FC = () => {
       <Sidebar />
       <main className="flex-1 md:ml-[230px] px-4 pt-10 pb-8">
         <div className="w-full max-w-100%">
-          {/* Nagłówek + akcje (import globalny, eksport pojedynczy jest per-karta) */}
+          {/* Nagłówek + akcje */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
             <h2 className="text-2xl font-bold text-[#222B45]">
               Twoje szablony testów
@@ -584,130 +771,198 @@ const TestTemplates: React.FC = () => {
 
                 <label className="font-semibold block mb-2 mt-5">Zadania</label>
                 <div>
-                  {addTasks.map((task, idx) => (
-                    <div
-                      key={idx}
-                      className="flex flex-wrap gap-4 items-center mb-3 bg-[#f7fafc] rounded-lg px-4 py-3"
-                    >
-                      <span className="font-bold mr-2 min-w-[80px]">
-                        Zadanie {idx + 1}.
-                      </span>
-
-                      <div className="min-w-[250px] flex-1">
-                        <label className="block text-xs mb-1">
-                          Opis zadania
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Opis zadania"
-                          value={task.description}
-                          onChange={(e) =>
-                            updateAddTask(idx, "description", e.target.value)
-                          }
-                          className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:border-teal-400"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs mb-1">
-                          Punkty min/max{" "}
-                          <span className="text-gray-500 ">
-                            (krok: {task.allowHalfPoints ? "0.5" : "1"})
-                          </span>
-                        </label>
-                        <input
-                          type="number"
-                          min={0}
-                          step={task.allowHalfPoints ? 0.5 : 1}
-                          value={task.minPoints}
-                          onChange={(e) =>
-                            setAddTasks((s) =>
-                              s.map((t, i) => {
-                                if (i !== idx) return t;
-                                const halves = t.allowHalfPoints;
-                                const newMin = snapByRule(
-                                  Number(e.target.value),
-                                  halves
-                                );
-                                const newMax =
-                                  newMin > t.maxPoints ? newMin : t.maxPoints;
-                                return {
-                                  ...t,
-                                  minPoints: newMin,
-                                  maxPoints: snapByRule(newMax, halves),
-                                };
-                              })
-                            )
-                          }
-                          className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
-                          required
-                        />
-                        <span className="mx-1 mt-2 text-gray-500">/</span>
-                        <input
-                          type="number"
-                          min={task.minPoints}
-                          step={task.allowHalfPoints ? 0.5 : 1}
-                          value={task.maxPoints}
-                          onChange={(e) =>
-                            setAddTasks((s) =>
-                              s.map((t, i) => {
-                                if (i !== idx) return t;
-                                const halves = t.allowHalfPoints;
-                                const raw = Number(e.target.value);
-                                const clamped =
-                                  raw < t.minPoints ? t.minPoints : raw;
-                                return {
-                                  ...t,
-                                  maxPoints: snapByRule(clamped, halves),
-                                };
-                              })
-                            )
-                          }
-                          className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
-                          required
-                        />
-                      </div>
-                      <div className="min-h-[62px] text-center">
-                        <label className="block text-xs mb-3">
-                          Punkty połówkowe
-                        </label>
-                        <input
-                          className="relative h-4 w-4 cursor-pointer transition-all before:absolute before:top-2/4 before:left-2/4 before:block before:h-10 before:w-10 before:-translate-y-2/4 before:-translate-x-2/4 before:rounded-full before:bg-slate-400 before:opacity-0 before:transition-opacity checked:bg-slate-800 checked:before:bg-slate-400 hover:before:opacity-10 "
-                          type="checkbox"
-                          checked={task.allowHalfPoints}
-                          onChange={(e) => {
-                            const halves = e.target.checked;
-                            setAddTasks((s) =>
-                              s.map((t, i) =>
-                                i === idx
-                                  ? {
-                                      ...t,
-                                      allowHalfPoints: halves,
-                                      minPoints: snapByRule(
-                                        t.minPoints,
-                                        halves
-                                      ),
-                                      maxPoints: snapByRule(
-                                        Math.max(t.maxPoints, t.minPoints),
-                                        halves
-                                      ),
-                                    }
-                                  : t
-                              )
-                            );
-                          }}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-2 transition"
-                        disabled={addTasks.length === 1}
-                        onClick={() => removeAddTask(idx)}
+                  {addTasks.map((task, idx) => {
+                    const highlight =
+                      overAdd === idx ? "ring-2 ring-teal-300" : "";
+                    return (
+                      <div
+                        key={idx}
+                        className={`flex flex-wrap gap-4 items-start mb-3 bg-[#f7fafc] rounded-lg px-4 py-3 transition ${highlight}`}
+                        draggable
+                        onDragStart={(e) => onAddDragStart(idx, e)}
+                        onDragOver={(e) => onAddDragOver(idx, e)}
+                        onDrop={(e) => onAddDrop(idx, e)}
+                        onDragEnd={onAddDragEnd}
                       >
-                        Usuń
-                      </button>
-                    </div>
-                  ))}
+                        {/* Uchwyt DnD */}
+                        <div className="flex items-center">
+                          <span
+                            className="cursor-grab select-none text-gray-400"
+                            title="Przeciągnij, aby zmienić kolejność"
+                          >
+                            ⋮⋮
+                          </span>
+                        </div>
+
+                        {/* KOLEJNOŚĆ */}
+                        <div>
+                          <label className="block text-xs mb-1">Kolejność</label>
+                          <input
+                            type="number"
+                            className="w-20 text-center border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:border-teal-400"
+                            value={task.order}
+                            onChange={(e) =>
+                              updateAddTask(idx, "order", e.target.value)
+                            }
+                            title="Kolejność"
+                            min={1}
+                          />
+                        </div>
+
+                        {/* NAZWA */}
+                        <div className="min-w-[80px]">
+                          <label className="block text-xs mb-1">Nazwa</label>
+                          <input
+                            type="text"
+                            value={task.name || ""}
+                            onChange={(e) =>
+                              updateAddTask(idx, "name", e.target.value)
+                            }
+                            className="border border-gray-300 rounded-lg px-3 py-2 w-20 focus:outline-none focus:border-teal-400"
+                            placeholder="np. 12a"
+                          />
+                        </div>
+
+                        {/* CZYNNOŚĆ */}
+                        <div className="min-w-[220px] flex-1">
+                          <label className="block text-xs mb-1">Czynność</label>
+                          <input
+                            type="text"
+                            value={task.activity || ""}
+                            onChange={(e) =>
+                              updateAddTask(idx, "activity", e.target.value)
+                            }
+                            className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:border-teal-400"
+                            placeholder="Opis czynności"
+                          />
+                        </div>
+
+                        {/* TREŚĆ */}
+                        <div className="min-w-[320px] flex-1">
+                          <label className="block text-xs mb-1">
+                            Treść zadania
+                          </label>
+                          <textarea
+                            placeholder="Treść zadania"
+                            value={task.content}
+                            onChange={(e) =>
+                              updateAddTask(idx, "content", e.target.value)
+                            }
+                            className="border border-gray-300 rounded-lg px-3 py-2 w-full min-h-[42px] h-[42px] focus:outline-none focus:border-teal-400"
+                            required
+                          />
+                        </div>
+
+                        {/* PUNKTY */}
+                        <div>
+                          <label className="block text-xs mb-1">
+                            Punkty min/max{" "}
+                            <span className="text-gray-500 ">
+                              (krok: {task.allowHalfPoints ? "0.5" : "1"})
+                            </span>
+                          </label>
+                          <div className="flex items-center">
+                            <input
+                              type="number"
+                              min={0}
+                              step={task.allowHalfPoints ? 0.5 : 1}
+                              value={task.minPoints}
+                              onChange={(e) =>
+                                setAddTasks((s) =>
+                                  s.map((t, i) => {
+                                    if (i !== idx) return t;
+                                    const halves = t.allowHalfPoints;
+                                    const newMin = snapByRule(
+                                      Number(e.target.value),
+                                      halves
+                                    );
+                                    const newMax =
+                                      newMin > t.maxPoints ? newMin : t.maxPoints;
+                                    return {
+                                      ...t,
+                                      minPoints: newMin,
+                                      maxPoints: snapByRule(newMax, halves),
+                                    };
+                                  })
+                                )
+                              }
+                              className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
+                              required
+                            />
+                            <span className="mx-1 mt-2 text-gray-500">/</span>
+                            <input
+                              type="number"
+                              min={task.minPoints}
+                              step={task.allowHalfPoints ? 0.5 : 1}
+                              value={task.maxPoints}
+                              onChange={(e) =>
+                                setAddTasks((s) =>
+                                  s.map((t, i) => {
+                                    if (i !== idx) return t;
+                                    const halves = t.allowHalfPoints;
+                                    const raw = Number(e.target.value);
+                                    const clamped =
+                                      raw < t.minPoints ? t.minPoints : raw;
+                                    return {
+                                      ...t,
+                                      maxPoints: snapByRule(clamped, halves),
+                                    };
+                                  })
+                                )
+                              }
+                              className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        {/* POŁÓWKI */}
+                        <div className="min-h-[62px] text-center">
+                          <label className="block text-xs mb-3">
+                            Punkty połówkowe
+                          </label>
+                          <input
+                            className="relative h-4 w-4 cursor-pointer transition-all before:absolute before:top-2/4 before:left-2/4 before:block before:h-10 before:w-10 before:-translate-y-2/4 before:-translate-x-2/4 before:rounded-full before:bg-slate-400 before:opacity-0 before:transition-opacity checked:bg-slate-800 checked:before:bg-slate-400 hover:before:opacity-10 "
+                            type="checkbox"
+                            checked={task.allowHalfPoints}
+                            onChange={(e) => {
+                              const halves = e.target.checked;
+                              setAddTasks((s) =>
+                                s.map((t, i) =>
+                                  i === idx
+                                    ? {
+                                        ...t,
+                                        allowHalfPoints: halves,
+                                        minPoints: snapByRule(
+                                          t.minPoints,
+                                          halves
+                                        ),
+                                        maxPoints: snapByRule(
+                                          Math.max(t.maxPoints, t.minPoints),
+                                          halves
+                                        ),
+                                      }
+                                    : t
+                                )
+                              );
+                            }}
+                          />
+                        </div>
+
+                        {/* DELETE */}
+                        <div className="self-center">
+                          <button
+                            type="button"
+                            className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-2 transition"
+                            disabled={addTasks.length === 1}
+                            onClick={() => removeAddTask(idx)}
+                          >
+                            Usuń
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <button
@@ -740,6 +995,7 @@ const TestTemplates: React.FC = () => {
               </form>
             </div>
           )}
+
           {/* Lista szablonów */}
           {loading ? (
             <div>Ładowanie...</div>
@@ -758,21 +1014,37 @@ const TestTemplates: React.FC = () => {
                       {template.tasks.length === 0 ? (
                         <div className="text-gray-400 text-sm">Brak zadań</div>
                       ) : (
-                        template.tasks.map((task, idx) => (
-                          <div key={task.id || idx} className="text-sm my-1">
-                            <span className="font-semibold">
-                              Zadanie {idx + 1}.
-                            </span>{" "}
-                            {task.description}{" "}
-                            <span className="text-xs text-gray-400">
-                              ({task.minPoints}-{task.maxPoints} pkt,{" "}
-                              {task.allowHalfPoints
-                                ? "połówki: TAK"
-                                : "połówki: NIE"}
-                              )
-                            </span>
-                          </div>
-                        ))
+                        template.tasks
+                          .slice()
+                          .sort((a, b) => a.order - b.order)
+                          .map((task) => (
+                            <div key={task.id} className="text-sm my-1">
+                              <span className="font-semibold">
+                                Zadanie {task.order}.
+                              </span>{" "}
+                              {task.name ? (
+                                <span className="text-gray-700 mr-1">
+                                  [{task.name}]
+                                </span>
+                              ) : null}
+                              <span className="text-gray-600">
+                                {task.content}
+                              </span>{" "}
+                              {task.activity && (
+                                <span className="text-xs text-gray-500">
+                                  — {task.activity}
+                                </span>
+                              )}
+                              <span className="text-xs text-gray-400">
+                                {" "}
+                                ({task.minPoints}-{task.maxPoints} pkt,{" "}
+                                {task.allowHalfPoints
+                                  ? "połówki: TAK"
+                                  : "połówki: NIE"}
+                                )
+                              </span>
+                            </div>
+                          ))
                       )}
                     </div>
                   </div>
@@ -851,125 +1123,191 @@ const TestTemplates: React.FC = () => {
 
             <label className="font-semibold block mb-2 mt-5">Zadania</label>
             <div className="overflow-y-auto max-h-[40vh] block">
-              {editTasks.map((task, idx) => (
-                <div
-                  key={idx}
-                  className="flex flex-wrap gap-4 items-center mb-3 bg-[#f7fafc] rounded-lg px-4 py-3"
-                >
-                  <span className="font-bold mr-2 min-w-[80px]">
-                    Zadanie {idx + 1}.
-                  </span>
-                  <div className="min-w-[250px] flex-1">
-                    <label className="block text-xs mb-1">Opis zadania</label>
-                    <input
-                      type="text"
-                      placeholder="Opis zadania"
-                      value={task.description}
-                      onChange={(e) =>
-                        updateEditTask(idx, "description", e.target.value)
-                      }
-                      className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:border-teal-400"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs mb-1">
-                      Punkty min/max{" "}
-                      <span className="text-gray-500 ">
-                        (krok: {task.allowHalfPoints ? "0.5" : "1"})
-                      </span>
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      step={task.allowHalfPoints ? 0.5 : 1}
-                      value={task.minPoints}
-                      onChange={(e) =>
-                        setEditTasks((s) =>
-                          s.map((t, i) => {
-                            if (i !== idx) return t;
-                            const halves = t.allowHalfPoints;
-                            const newMin = snapByRule(
-                              Number(e.target.value),
-                              halves
-                            );
-                            const newMax =
-                              newMin > t.maxPoints ? newMin : t.maxPoints;
-                            return {
-                              ...t,
-                              minPoints: newMin,
-                              maxPoints: snapByRule(newMax, halves),
-                            };
-                          })
-                        )
-                      }
-                      className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
-                      required
-                    />
-                    <span className="mx-1 text-gray-500">/</span>
-                    <input
-                      type="number"
-                      min={task.minPoints}
-                      step={task.allowHalfPoints ? 0.5 : 1}
-                      value={task.maxPoints}
-                      onChange={(e) =>
-                        setEditTasks((s) =>
-                          s.map((t, i) => {
-                            if (i !== idx) return t;
-                            const halves = t.allowHalfPoints;
-                            const raw = Number(e.target.value);
-                            const clamped =
-                              raw < t.minPoints ? t.minPoints : raw;
-                            return {
-                              ...t,
-                              maxPoints: snapByRule(clamped, halves),
-                            };
-                          })
-                        )
-                      }
-                      className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
-                      required
-                    />
-                  </div>
-                  <div className="min-h-[62px] text-center">
-                    <label className="block text-xs mb-3">
-                      Punkty połówkowe
-                    </label>
-                    <input
-                      className="relative h-4 w-4 cursor-pointer transition-all before:absolute before:top-2/4 before:left-2/4 before:block before:h-10 before:w-10 before:-translate-y-2/4 before:-translate-x-2/4 before:rounded-full before:bg-slate-400 before:opacity-0 before:transition-opacity checked:bg-slate-800 checked:before:bg-slate-400 hover:before:opacity-10 "
-                      type="checkbox"
-                      checked={task.allowHalfPoints}
-                      onChange={(e) => {
-                        const halves = e.target.checked;
-                        setEditTasks((s) =>
-                          s.map((t, i) =>
-                            i === idx
-                              ? {
-                                  ...t,
-                                  allowHalfPoints: halves,
-                                  minPoints: snapByRule(t.minPoints, halves),
-                                  maxPoints: snapByRule(
-                                    Math.max(t.maxPoints, t.minPoints),
-                                    halves
-                                  ),
-                                }
-                              : t
-                          )
-                        );
-                      }}
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-2 transition"
-                    disabled={editTasks.length === 1}
-                    onClick={() => removeEditTask(idx)}
+              {editTasks.map((task, idx) => {
+                const highlight =
+                  overEdit === idx ? "ring-2 ring-teal-300" : "";
+                return (
+                  <div
+                    key={task.id ?? `temp-${idx}`}
+                    className={`flex flex-wrap gap-4 items-start mb-3 mx-1 my-1 bg-[#f7fafc] rounded-lg px-4 py-3 transition ${highlight}`}
+                    draggable
+                    onDragStart={(e) => onEditDragStart(idx, e)}
+                    onDragOver={(e) => onEditDragOver(idx, e)}
+                    onDrop={(e) => onEditDrop(idx, e)}
+                    onDragEnd={onEditDragEnd}
                   >
-                    Usuń
-                  </button>
-                </div>
-              ))}
+                    {/* Uchwyt DnD */}
+                    <div className="flex items-center">
+                      <span
+                        className="cursor-grab select-none text-gray-400"
+                        title="Przeciągnij, aby zmienić kolejność"
+                      >
+                        ⋮⋮
+                      </span>
+                    </div>
+
+                    {/* KOLEJNOŚĆ */}
+                    <div>
+                      <label className="block text-xs mb-1">Kolejność</label>
+                      <input
+                        type="number"
+                        className="w-20 text-center border border-gray-300 rounded-lg px-2 py-2 focus:outline-none focus:border-teal-400"
+                        value={task.order}
+                        onChange={(e) =>
+                          updateEditTask(idx, "order", e.target.value)
+                        }
+                        title="Kolejność"
+                        min={1}
+                      />
+                    </div>
+
+                    {/* NAZWA */}
+                    <div className="min-w-[80px]">
+                      <label className="block text-xs mb-1">Nazwa</label>
+                      <input
+                        type="text"
+                        placeholder="np. 12a"
+                        value={task.name || ""}
+                        onChange={(e) => updateEditTask(idx, "name", e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-2 w-20 focus:outline-none focus:border-teal-400"
+                      />
+                    </div>
+
+                    {/* CZYNNOŚĆ */}
+                    <div className="min-w-[220px] flex-1">
+                      <label className="block text-xs mb-1">Czynność</label>
+                      <input
+                        type="text"
+                        placeholder="Opis czynności"
+                        value={task.activity || ""}
+                        onChange={(e) =>
+                          updateEditTask(idx, "activity", e.target.value)
+                        }
+                        className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:border-teal-400"
+                      />
+                    </div>
+
+                    {/* TREŚĆ */}
+                    <div className="min-w-[320px] flex-1">
+                      <label className="block text-xs mb-1">Treść zadania</label>
+                      <textarea
+                        placeholder="Treść zadania"
+                        value={task.content}
+                        onChange={(e) =>
+                          updateEditTask(idx, "content", e.target.value)
+                        }
+                        className="border border-gray-300 rounded-lg px-3 py-2 w-full min-h-[42px] h-[42px] focus:outline-none focus:border-teal-400"
+                        required
+                      />
+                    </div>
+
+                    {/* PUNKTY */}
+                    <div>
+                      <label className="block text-xs mb-1">
+                        Punkty min/max{" "}
+                        <span className="text-gray-500 ">
+                          (krok: {task.allowHalfPoints ? "0.5" : "1"})
+                        </span>
+                      </label>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          min={0}
+                          step={task.allowHalfPoints ? 0.5 : 1}
+                          value={task.minPoints}
+                          onChange={(e) =>
+                            setEditTasks((s) =>
+                              s.map((t, i) => {
+                                if (i !== idx) return t;
+                                const halves = t.allowHalfPoints;
+                                const newMin = snapByRule(
+                                  Number(e.target.value),
+                                  halves
+                                );
+                                const newMax =
+                                  newMin > t.maxPoints ? newMin : t.maxPoints;
+                                return {
+                                  ...t,
+                                  minPoints: newMin,
+                                  maxPoints: snapByRule(newMax, halves),
+                                };
+                              })
+                            )
+                          }
+                          className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
+                          required
+                        />
+                        <span className="mx-1 text-gray-500">/</span>
+                        <input
+                          type="number"
+                          min={task.minPoints}
+                          step={task.allowHalfPoints ? 0.5 : 1}
+                          value={task.maxPoints}
+                          onChange={(e) =>
+                            setEditTasks((s) =>
+                              s.map((t, i) => {
+                                if (i !== idx) return t;
+                                const halves = t.allowHalfPoints;
+                                const raw = Number(e.target.value);
+                                const clamped =
+                                  raw < t.minPoints ? t.minPoints : raw;
+                                return {
+                                  ...t,
+                                  maxPoints: snapByRule(clamped, halves),
+                                };
+                              })
+                            )
+                          }
+                          className="border border-gray-300 rounded-lg px-2 py-2 w-16 focus:outline-none focus:border-teal-400"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* POŁÓWKI */}
+                    <div className="min-h-[62px] text-center">
+                      <label className="block text-xs mb-3">
+                        Punkty połówkowe
+                      </label>
+                      <input
+                        className="relative h-4 w-4 cursor-pointer transition-all before:absolute before:top-2/4 before:left-2/4 before:block before:h-10 before:w-10 before:-translate-y-2/4 before:-translate-x-2/4 before:rounded-full before:bg-slate-400 before:opacity-0 before:transition-opacity checked:bg-slate-800 checked:before:bg-slate-400 hover:before:opacity-10 "
+                        type="checkbox"
+                        checked={task.allowHalfPoints}
+                        onChange={(e) => {
+                          const halves = e.target.checked;
+                          setEditTasks((s) =>
+                            s.map((t, i) =>
+                              i === idx
+                                ? {
+                                    ...t,
+                                    allowHalfPoints: halves,
+                                    minPoints: snapByRule(t.minPoints, halves),
+                                    maxPoints: snapByRule(
+                                      Math.max(t.maxPoints, t.minPoints),
+                                      halves
+                                    ),
+                                  }
+                                : t
+                            )
+                          );
+                        }}
+                      />
+                    </div>
+
+                    {/* DELETE */}
+                    <div className="self-center">
+                      <button
+                        type="button"
+                        className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-2 transition"
+                        disabled={editTasks.length === 1}
+                        onClick={() => removeEditTask(idx)}
+                      >
+                        Usuń
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             <button

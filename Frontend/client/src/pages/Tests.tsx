@@ -20,7 +20,9 @@ type Student = {
 type Template = { id: number; name: string };
 type Task = {
   id: number;
-  description: string;
+  name?: string | null;
+  activity?: string | null;
+  content: string;
   order: number;
   minPoints: number;
   maxPoints: number;
@@ -703,11 +705,11 @@ const Tests: React.FC = () => {
                           className="flex items-center gap-3 bg-[#f7fafc] rounded-lg px-4 py-3"
                         >
                           <div className="min-w-[72px] font-bold mt-1">
-                            Zad. {t.order}
+                            Zad. {t.name ? `${t.name}` : t.order}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium break-words whitespace-pre-wrap">
-                              {t.description}
+                              {t.content}
                             </div>
                             <div className="text-xs text-gray-400">
                               ({t.minPoints}–{t.maxPoints} pkt, krok{" "}

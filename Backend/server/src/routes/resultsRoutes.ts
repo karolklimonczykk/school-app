@@ -42,7 +42,9 @@ router.get(
       orderBy: { order: "asc" },
       select: {
         id: true,
-        description: true,
+        name: true,
+        activity: true,
+        content: true, // <-- zamiast description
         order: true,
         minPoints: true,
         maxPoints: true,
@@ -224,7 +226,9 @@ router.get(
       return {
         id: t.id,
         order: t.order,
-        description: t.description,
+        name: t.name ?? null,
+        activity: t.activity ?? null,
+        content: t.content,
         minPoints: t.minPoints,
         maxPoints: t.maxPoints,
         avgPoints: n ? sumPts / n : 0,

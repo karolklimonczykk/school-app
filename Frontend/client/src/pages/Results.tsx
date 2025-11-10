@@ -20,13 +20,13 @@ type Session = {
 type ItemStat = {
   id: number;
   order: number;
-  description: string;
+  name?: string | null;
+  activity?: string | null;
+  content: string;
   minPoints: number;
   maxPoints: number;
   avgPoints: number;
-  p: number; // łatwość
-  q: number; // trudność
-  f: number; // frakcja opuszczeń
+  p: number; q: number; f: number;
   variance: number;
   discrimination: number;
 };
@@ -464,8 +464,10 @@ const Results: React.FC = () => {
 
     // Zadania + interpretacje
     const itemsHeaderRow = aoa.push([
-      "Nr",
-      "Opis",
+      "Lp.",
+      "Nazwa zadania",
+      "Opis czynności",
+      "Treść zadania",
       "Min",
       "Max",
       "Śr. pkt",
@@ -482,7 +484,9 @@ const Results: React.FC = () => {
     overview.items.forEach((it) => {
       aoa.push([
         it.order,
-        it.description,
+        it.name || "",
+        it.activity || "",
+        it.content,
         it.minPoints,
         it.maxPoints,
         it.avgPoints,
@@ -1044,10 +1048,13 @@ const Results: React.FC = () => {
                         <thead>
                           <tr>
                             <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6 pr-6">
-                              ZAD.
+                              Lp.
+                            </th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6 pr-6">
+                              ZADANIE
                             </th>
                             <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
-                              OPIS
+                              TREŚĆ ZADANIA
                             </th>
                             <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
                               ŚR.PKT
@@ -1070,22 +1077,24 @@ const Results: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {overview.items.map((it, idx) => {
-                            const isLast = idx === overview.items.length - 1;
+                          {overview.items.map((it) => {
                             return (
                               <tr
                                 key={it.id}
                                 className="transition hover:bg-gray-50"
                                 style={{
                                   borderColor: "#ececec",
-                                  borderWidth: isLast ? 0 : "0.2px",
+                                  borderWidth: "0.2px",
                                 }}
                               >
                                 <td className="py-4 pl-6 pr-6 text-gray-800 font-semibold">
                                   {it.order}.
                                 </td>
+                                <td className="py-4 pl-6 pr-6 text-gray-800 font-semibold">
+                                  {it.name}
+                                </td>
                                 <td className="py-4 pr-6 text-gray-700 max-w-[900px] break-words whitespace-pre-wrap">
-                                  {it.description}
+                                  {it.content}
                                 </td>
                                 <td className="py-4 pr-6 text-gray-800">
                                   {it.avgPoints.toFixed(2)}

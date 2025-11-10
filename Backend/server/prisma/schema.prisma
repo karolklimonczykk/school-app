@@ -64,7 +64,9 @@ model TestTemplate {
 
 model TestTask {
   id          Int           @id @default(autoincrement())
-  description String
+  name        String?
+  activity    String?
+  content     String
   minPoints   Int
   maxPoints   Int
   allowHalfPoints Boolean @default(true)
