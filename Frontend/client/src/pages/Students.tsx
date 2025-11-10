@@ -11,7 +11,7 @@ type Student = {
   id: number;
   firstName: string;
   lastName: string;
-  gender: string;
+    gender?: "M" | "K" | "N" | null;
   order: number;
   classId: number;
   class?: { id: number; name: string; school: School };
@@ -26,7 +26,7 @@ const Students: React.FC = () => {
   const [newStudent, setNewStudent] = useState({
     firstName: "",
     lastName: "",
-    gender: "",
+    gender: "N" as "M" | "K" | "N",
   });
 
   const [loading, setLoading] = useState(false);
@@ -34,7 +34,7 @@ const Students: React.FC = () => {
   const [editStudent, setEditStudent] = useState({
     firstName: "",
     lastName: "",
-    gender: "M",
+     gender: "N" as "M" | "K" | "N",
   });
   const [showAddInput, setShowAddInput] = useState(false);
 
@@ -117,7 +117,7 @@ const Students: React.FC = () => {
   useEffect(() => {
     if (!selectedSchoolId || !selectedClassId) {
       setShowAddInput(false);
-      setNewStudent({ firstName: "", lastName: "", gender: "" });
+      setNewStudent({ firstName: "", lastName: "", gender: "N" });
     }
   }, [selectedSchoolId, selectedClassId]);
 
@@ -197,7 +197,7 @@ const Students: React.FC = () => {
         { headers: tokenHeader() }
       );
       setStudents([...students, res.data]);
-      setNewStudent({ firstName: "", lastName: "", gender: "" });
+      setNewStudent({ firstName: "", lastName: "", gender: "N" });
       setShowAddInput(false);
       push({ type: "success", message: "Uczeń dodany!" });
     } catch (err: unknown) {
@@ -215,7 +215,7 @@ const Students: React.FC = () => {
     setEditStudent({
       firstName: student.firstName,
       lastName: student.lastName,
-      gender: student.gender,
+      gender: (student.gender ?? "N") as "M" | "K" | "N",
     });
   };
 
@@ -253,7 +253,7 @@ const Students: React.FC = () => {
 
   const handleCancelEdit = () => {
     setEditId(null);
-    setEditStudent({ firstName: "", lastName: "", gender: "M" });
+    setEditStudent({ firstName: "", lastName: "", gender: "N" });
   };
 
   const handleDeleteStudent = async (
@@ -440,9 +440,9 @@ const Students: React.FC = () => {
               {/* Płeć */}
               <div className="w-full md:basis-1/4 relative">
                 <select
-                  value={newStudent.gender}
+                  value={newStudent.gender ?? "N"}
                   onChange={(e) =>
-                    setNewStudent({ ...newStudent, gender: e.target.value })
+                    setNewStudent({ ...newStudent, gender: e.target.value as "M" | "K" | "N" })
                   }
                   required
                   className="appearance-none border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-teal-400"
@@ -453,6 +453,7 @@ const Students: React.FC = () => {
                   </option>
                   <option value="M">Mężczyzna</option>
                   <option value="K">Kobieta</option>
+                  <option value="N">Nieznana</option>
                 </select>
                 <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-500">
                   <svg
@@ -481,7 +482,7 @@ const Students: React.FC = () => {
                   className="text-gray-400 font-semibold hover:bg-gray-100 rounded px-4 py-2 transition"
                   onClick={() => {
                     setShowAddInput(false);
-                    setNewStudent({ firstName: "", lastName: "", gender: "" });
+                    setNewStudent({ firstName: "", lastName: "", gender: "N" });
                   }}
                 >
                   Anuluj
@@ -561,12 +562,13 @@ const Students: React.FC = () => {
                                 onChange={(e) =>
                                   setEditStudent({
                                     ...editStudent,
-                                    gender: e.target.value,
+                                    gender: e.target.value as "M"|"K"|"N",
                                   })
                                 }
                               >
                                 <option value="M">M</option>
                                 <option value="K">K</option>
+                                <option value="N">N</option>
                               </select>
                               <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-gray-500">
                                 <svg
@@ -584,8 +586,8 @@ const Students: React.FC = () => {
                           </div>
                         ) : (
                           <span className="text-gray-800 font-semibold text-base break-all">
-                            {student.firstName} {student.lastName} (
-                            {student.gender})
+                            {student.firstName} {student.lastName}
+                            {student.gender && student.gender !== "N" ? ` (${student.gender})` : ""}
                           </span>
                         )}
                       </td>
