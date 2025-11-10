@@ -301,11 +301,6 @@ const Results: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSchoolId, selectedClassId]);
 
-  useEffect(() => {
-    setSelectedStudentId("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSchoolId, selectedClassId, selectedTestId]);
-
   // Pobranie Overview
   const fetchOverview = async () => {
     if (!selectedTestId) {
@@ -326,16 +321,6 @@ const Results: React.FC = () => {
         }
       );
       setOverview(res.data);
-
-      if (!selectedStudentId) {
-        setStudentsForFilter(
-          (res.data.students || []).map((s) => ({
-            id: s.studentId,
-            firstName: s.firstName,
-            lastName: s.lastName,
-          }))
-        );
-      }
     } catch {
       setOverview(null);
       push({ type: "error", message: "Błąd analizy wyników." });
@@ -347,12 +332,6 @@ const Results: React.FC = () => {
   useEffect(() => {
     fetchOverview(); /* eslint-disable-next-line */
   }, [selectedTestId, selectedSchoolId, selectedClassId, selectedStudentId]);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const selectedSession = useMemo(
-    () => sessions.find((s) => s.id === selectedTestId) || null,
-    [sessions, selectedTestId]
-  );
 
   // Normalizacja do wykresu słupkowego (0..100%)
   const taskBars = useMemo(() => {
@@ -399,57 +378,52 @@ const Results: React.FC = () => {
     }));
   }, [overview, studentMetric]);
 
-  // Eksport do natywnego Excela (XLSX) – zachowuje polskie znaki i typy liczb
   const safeFileName = (name: string) =>
     (name || "wyniki").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 120);
 
-  // r – 1-indeksowany względem AOA, c – 0-indeksowany (A=0, B=1, …)
-  const cellAddr = (r: number, c: number) =>
-    XLSX.utils.encode_cell({ r: r - 1, c });
+  const addr = (r1based: number, c0based: number) =>
+    XLSX.utils.encode_cell({ r: r1based - 1, c: c0based });
+  const interpretEase = (p: number): string => {
+    if (p < 0.2) return "Bardzo trudna";
+    if (p < 0.5) return "Trudna";
+    if (p < 0.7) return "Umiarkowanie trudna";
+    if (p < 0.9) return "Łatwa"; // 0.70–0.79 i 0.80–0.899 -> „Łatwa”
+    return "Bardzo łatwa"; // 0.90–1.00
+  };
 
-  // Jedno zapytanie o macierz punktów (szybciej niż po 1 uczniu).
-  // Jeśli backend nie ma jeszcze endpointu, niżej podaję jego krótką implementację.
-  async function fetchPointsMatrix(
-    token: string,
-    overview: Overview,
-    scope: {
-      schoolId?: number | "";
-      classId?: number | "";
-      studentId?: number | "";
-    }
-  ): Promise<{
-    orders: number[];
-    rows: {
-      studentId: number;
-      firstName: string;
-      lastName: string;
-      points: (number | null)[];
-    }[];
-  }> {
-    const params = new URLSearchParams();
-    params.set("testId", String(overview.header.testId));
-    if (scope.schoolId) params.set("schoolId", String(scope.schoolId));
-    if (scope.classId) params.set("classId", String(scope.classId));
-    if (scope.studentId) params.set("studentId", String(scope.studentId));
+  const interpretDiscrimination = (r: number): string => {
+    if (r < 0) return "Ujemna (zadanie wadliwe)";
+    if (r <= 0.2) return "Nie różnicują";
+    if (r <= 0.4) return "Słabo różnicują";
+    if (r <= 0.6) return "Średnio różnicują";
+    if (r <= 0.8) return "Dobrze różnicują";
+    return "Bardzo dobrze różnicują";
+  };
 
-    const url = `http://localhost:4000/results/points?${params.toString()}`;
-    const res = await axios.get(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return res.data;
-  }
+  const interpretReliability = (alpha: number): string => {
+    if (alpha < 0.5) return "Nierzetelny (nie wnioskować)";
+    if (alpha < 0.8) return "Mało rzetelny";
+    if (alpha < 0.9) return "Rzetelny";
+    return "Bardzo rzetelny";
+  };
+
   const exportXLSX = async () => {
     if (!overview) return;
 
-    // ---------- ARKUSZ 1: „Wyniki” ----------
+    // ---------- ARKUSZ 1: „Wyniki” (jak dotąd) + interpretacje ----------
     const aoa: (string | number | null)[][] = [];
 
-    // meta
+    // Meta
     aoa.push(["Sesja", overview.header.testName]);
     aoa.push(["Szablon", overview.header.templateName]);
     aoa.push(["Uczniów (n)", overview.header.n]);
     aoa.push(["Maksymalna suma punktów", overview.header.totalMax]);
     aoa.push(["Łatwość testu (p)", overview.header.pTest]);
+    aoa.push([
+      "Rzetelność (α)",
+      overview.summary.alpha,
+      "Interpretacja:" + interpretReliability(overview.summary.alpha),
+    ]);
     aoa.push(["Średnia", overview.summary.mean]);
     aoa.push(["Mediana", overview.summary.median]);
     aoa.push(["Moda", overview.summary.mode ?? null]);
@@ -458,12 +432,13 @@ const Results: React.FC = () => {
     aoa.push(["Rozstęp", overview.summary.range]);
     aoa.push(["Wariancja", overview.summary.variance]);
     aoa.push(["Odch. std.", overview.summary.stdDev]);
-    aoa.push(["Alfa Cronbacha", overview.summary.alpha]);
     aoa.push(["Błąd std.", overview.summary.stdError]);
 
     aoa.push([]);
     aoa.push(["UCZNIOWIE"]);
-    const hdrRow = aoa.push([
+
+    // Uczniowie
+    const studentsHeaderRow = aoa.push([
       "Lp.",
       "Imię",
       "Nazwisko",
@@ -471,8 +446,7 @@ const Results: React.FC = () => {
       "Suma",
       "Wynik (%)",
     ]);
-    const studentsStart = hdrRow + 1;
-
+    const studentsDataStart = studentsHeaderRow + 1;
     overview.students.forEach((s, i) => {
       aoa.push([
         i + 1,
@@ -480,14 +454,16 @@ const Results: React.FC = () => {
         s.lastName,
         s.className,
         Number(s.total.toFixed(2)),
-        s.percent, // 0..1 — sformatujemy jako %
+        s.percent,
       ]);
     });
-    const studentsEnd = aoa.length;
+    const studentsDataEnd = aoa.length;
 
     aoa.push([]);
     aoa.push(["ZADANIA"]);
-    const itemsHdr = aoa.push([
+
+    // Zadania + interpretacje
+    const itemsHeaderRow = aoa.push([
       "Nr",
       "Opis",
       "Min",
@@ -498,8 +474,10 @@ const Results: React.FC = () => {
       "f",
       "Wariancja",
       "Moc różnicująca (r)",
+      "Interpretacja łatwości. Czynność okazała się:",
+      "Interpretacja zadań wg. mocy różnicującej",
     ]);
-    const itemsStart = itemsHdr + 1;
+    const itemsDataStart = itemsHeaderRow + 1;
 
     overview.items.forEach((it) => {
       aoa.push([
@@ -513,112 +491,100 @@ const Results: React.FC = () => {
         it.f,
         it.variance,
         it.discrimination,
+        interpretEase(it.p),
+        interpretDiscrimination(it.discrimination),
       ]);
     });
-    const itemsEnd = aoa.length;
+    const itemsDataEnd = aoa.length;
 
     const ws1 = XLSX.utils.aoa_to_sheet(aoa);
-
-    // Kolumny (orientacyjnie — nie wpływa na dane)
     ws1["!cols"] = [
-      { wch: 8 }, // Lp./Nr
-      { wch: 22 }, // Imię / Opis (opis i tak zajmie więcej)
-      { wch: 22 }, // Nazwisko
-      { wch: 16 }, // Klasa
-      { wch: 12 }, // Suma / Min
-      { wch: 12 }, // Wynik% / Max
-      { wch: 10 }, // Śr. pkt
-      { wch: 8 }, // p
-      { wch: 8 }, // q
-      { wch: 8 }, // f
-      { wch: 12 }, // Wariancja
-      { wch: 14 }, // r
+      { wch: 24 },
+      { wch: 60 },
+      { wch: 24 },
+      { wch: 16 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 10 },
+      { wch: 8 },
+      { wch: 8 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 20 },
+      { wch: 42 },
+      { wch: 45 },
     ];
 
-    // Format liczbowy w sekcji „Uczniowie”
-    for (let r = studentsStart; r <= studentsEnd - 1; r++) {
-      const totalCell = cellAddr(r, 4); // kol. E (0=A)
-      const percentCell = cellAddr(r, 5); // kol. F
-      if (ws1[totalCell]) ws1[totalCell].z = "0.00";
-      if (ws1[percentCell]) {
-        ws1[percentCell].t = "n";
-        ws1[percentCell].z = "0.00%";
+    // format uczniów
+    for (let r = studentsDataStart; r <= studentsDataEnd - 1; r++) {
+      const sumCell = addr(r, 4);
+      const pctCell = addr(r, 5);
+      if (ws1[sumCell]) ws1[sumCell].z = "0.00";
+      if (ws1[pctCell]) {
+        ws1[pctCell].t = "n";
+        ws1[pctCell].z = "0.00%";
       }
     }
-
-    // Format liczbowy w sekcji „Zadania”
-    for (let r = itemsStart; r <= itemsEnd; r++) {
+    // format zadań
+    for (let r = itemsDataStart; r <= itemsDataEnd; r++) {
       const setFmt = (c: number, fmt: string) => {
-        const a = cellAddr(r, c);
+        const a = addr(r, c);
         if (ws1[a]) ws1[a].z = fmt;
       };
-      setFmt(2, "0.00"); // Min
-      setFmt(3, "0.00"); // Max
-      ["0.00", "0.0000", "0.0000", "0.0000", "0.0000", "0.0000"].forEach(
-        (fmt, i) => setFmt(4 + i, fmt)
-      );
+      setFmt(2, "0.00");
+      setFmt(3, "0.00"); // Min/Max
+      setFmt(4, "0.0000");
+      setFmt(5, "0.0000");
+      setFmt(6, "0.0000"); // Śr, p, q
+      setFmt(7, "0.0000");
+      setFmt(8, "0.0000");
+      setFmt(9, "0.0000"); // f, Var, r
     }
 
-    // ---------- ARKUSZ 2: „Punkty” ----------
-    // jedno zapytanie o macierz (orders + rows[points])
-    let matrix: {
-      orders: number[];
-      rows: {
-        studentId: number;
-        firstName: string;
-        lastName: string;
-        points: (number | null)[];
-      }[];
-    };
-    try {
-      matrix = await fetchPointsMatrix(token as string, overview, {
-        schoolId: selectedSchoolId,
-        classId: selectedClassId,
-        studentId: selectedStudentId,
-      });
-    } catch {
-      // awaryjnie: jeżeli endpointu nie ma, zbuduj nagłówek z kolejności zadań i puste wiersze
-      matrix = {
-        orders: overview.items.map((i) => i.order),
-        rows: overview.students.map((s) => ({
-          studentId: s.studentId,
-          firstName: s.firstName,
-          lastName: s.lastName,
-          points: overview.items.map(() => null),
-        })),
-      };
-    }
-
+    // ---------- ARKUSZ 2: „Punkty” (fallback: po 1 zapytaniu na ucznia) ----------
+    const taskCount = overview.items.length;
     const header2 = [
       "Imię",
       "Nazwisko",
-      ...matrix.orders.map((nr) => String(nr)),
+      ...Array.from({ length: taskCount }, (_, i) => `${i + 1}`),
     ];
-    const rows2 = matrix.rows.map((r) => [
-      r.firstName,
-      r.lastName,
-      ...r.points.map((v) => (v == null ? "" : Number(v))),
-    ]);
 
-    const ws2 = XLSX.utils.aoa_to_sheet([header2, ...rows2]);
+    type TaskRes = { tasks: { order: number; points: number | null }[] };
+    const pointsRows: (string | number | "")[][] = await Promise.all(
+      overview.students.map(async (s) => {
+        try {
+          const res = await axios.get<TaskRes>(
+            `http://localhost:4000/tests/${overview.header.testId}/students/${s.studentId}/results`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          const byOrder: Record<number, number | null> = {};
+          res.data.tasks.forEach((t) => {
+            byOrder[t.order] = t.points;
+          });
+          const cols = Array.from({ length: taskCount }, (_, i) => {
+            const v = byOrder[i + 1];
+            return v === null || v === undefined ? "" : Number(v);
+          });
+          return [s.firstName, s.lastName, ...cols];
+        } catch {
+          return [s.firstName, s.lastName, ...Array(taskCount).fill("")];
+        }
+      })
+    );
+    const ws2 = XLSX.utils.aoa_to_sheet([header2, ...pointsRows]);
     ws2["!cols"] = [
-      { wch: 22 }, // Imię
-      { wch: 24 }, // Nazwisko
-      ...matrix.orders.map(() => ({ wch: 8 })),
+      { wch: 18 },
+      { wch: 22 },
+      ...Array(taskCount).fill({ wch: 6 }),
     ];
 
-    // ---------- Skoroszyt ----------
+    // ---------- Skoroszyt + zapis ----------
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws1, "Wyniki");
     XLSX.utils.book_append_sheet(wb, ws2, "Punkty");
-
     XLSX.writeFile(wb, `${safeFileName(overview.header.testName)}.xlsx`, {
       bookType: "xlsx",
       compression: true,
-    });
-    push({
-      type: "success",
-      message: "Wyeksportowano plik XLSX.",
     });
   };
 
