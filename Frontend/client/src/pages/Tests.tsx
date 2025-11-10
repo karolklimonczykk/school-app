@@ -12,7 +12,7 @@ type Student = {
   id: number;
   firstName: string;
   lastName: string;
-  gender: string;
+  gender?: "M" | "K" | "N" | null;
   order: number;
   classId: number;
   class?: { id: number; name: string; school: School };
