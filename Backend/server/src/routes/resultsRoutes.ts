@@ -85,7 +85,7 @@ router.get(
         id: true,
         firstName: true,
         lastName: true,
-        class: { select: { id: true, name: true } },
+        class: { select: { id: true, name: true, school: true } },
       },
       orderBy: [{ classId: "asc" }, { order: "asc" }, { lastName: "asc" }],
     });
@@ -154,6 +154,7 @@ router.get(
         firstName: s.firstName,
         lastName: s.lastName,
         className: s.class?.name ?? "",
+        schoolName: s.class?.school.name ?? "",
         total: sum,
         percent: totalMax ? sum / totalMax : 0,
       };

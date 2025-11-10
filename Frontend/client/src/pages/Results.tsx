@@ -36,6 +36,7 @@ type StudentRow = {
   firstName: string;
   lastName: string;
   className: string;
+  schoolName: string;
   total: number;
   percent: number;
 };
@@ -443,6 +444,7 @@ const Results: React.FC = () => {
       "Imię",
       "Nazwisko",
       "Klasa",
+      "Szkoła",
       "Suma",
       "Wynik (%)",
     ]);
@@ -453,6 +455,7 @@ const Results: React.FC = () => {
         s.firstName,
         s.lastName,
         s.className,
+        s.schoolName,
         Number(s.total.toFixed(2)),
         s.percent,
       ]);
@@ -504,7 +507,7 @@ const Results: React.FC = () => {
     const ws1 = XLSX.utils.aoa_to_sheet(aoa);
     ws1["!cols"] = [
       { wch: 24 },
-      { wch: 60 },
+      { wch: 24 },
       { wch: 24 },
       { wch: 16 },
       { wch: 12 },
@@ -521,8 +524,8 @@ const Results: React.FC = () => {
 
     // format uczniów
     for (let r = studentsDataStart; r <= studentsDataEnd - 1; r++) {
-      const sumCell = addr(r, 4);
-      const pctCell = addr(r, 5);
+      const sumCell = addr(r, 5);
+      const pctCell = addr(r, 6);
       if (ws1[sumCell]) ws1[sumCell].z = "0.00";
       if (ws1[pctCell]) {
         ws1[pctCell].t = "n";

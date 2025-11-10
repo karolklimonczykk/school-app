@@ -5,6 +5,7 @@ import Sidebar from "../components/Sidebar/Sidebar";
 import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { useToast } from "../components/Toast";
+import ImportFromResults from "../components/ImportFromResults";
 
 // Typy
 type School = { id: number; name: string; ownerId: number };
@@ -409,6 +410,7 @@ const Schools: React.FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
             <h2 className="text-2xl font-bold text-[#222B45]">Schools Table</h2>
             <div className="flex flex-wrap gap-2">
+              <ImportFromResults onImported={fetchSchools} />
               <button
                 onClick={importSchoolsClick}
                 className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
