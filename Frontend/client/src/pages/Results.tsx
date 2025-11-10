@@ -124,7 +124,10 @@ const Results: React.FC = () => {
   const [selectedSchoolId, setSelectedSchoolId] = useState<number | "">("");
   const [selectedClassId, setSelectedClassId] = useState<number | "">("");
   const [selectedTestId, setSelectedTestId] = useState<number | "">("");
-
+  const [selectedStudentId, setSelectedStudentId] = useState<number | "">("");
+  const [studentsForFilter, setStudentsForFilter] = useState<
+    { id: number; firstName: string; lastName: string }[]
+  >([]);
   // Dane analityczne
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(false);
@@ -207,9 +210,11 @@ const Results: React.FC = () => {
     const s = params.get("school");
     const c = params.get("class");
     const t = params.get("test");
+    const u = params.get("student");
     setSelectedSchoolId(s ? Number(s) : "");
     setSelectedClassId(c ? Number(c) : "");
     setSelectedTestId(t ? Number(t) : "");
+    setSelectedStudentId(u ? Number(u) : "");
   }, [location.search]);
 
   // Szkoły + sesje
@@ -256,6 +261,51 @@ const Results: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSchoolId]);
 
+  // Uczniowie dla szkoły+klasy (filtr)
+  useEffect(() => {
+    const loadStudentsForFilter = async () => {
+      if (!selectedSchoolId || !selectedClassId) {
+        setStudentsForFilter([]);
+        return;
+      }
+      try {
+        const res = await axios.get<
+          { id: number; firstName: string; lastName: string }[]
+        >(
+          `http://localhost:4000/schools/${selectedSchoolId}/classes/${selectedClassId}/students`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setStudentsForFilter(
+          res.data.map((s) => ({
+            id: s.id,
+            firstName: s.firstName,
+            lastName: s.lastName,
+          }))
+        );
+
+        // Jeśli wybrany uczeń nie należy do tej klasy – wyczyść także URL
+        if (
+          selectedStudentId &&
+          !res.data.some((s) => s.id === selectedStudentId)
+        ) {
+          setSelectedStudentId("");
+          const q = new URLSearchParams(location.search);
+          q.delete("student");
+          navigate(`/results?${q.toString()}`);
+        }
+      } catch {
+        setStudentsForFilter([]);
+      }
+    };
+    loadStudentsForFilter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSchoolId, selectedClassId]);
+
+  useEffect(() => {
+    setSelectedStudentId("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSchoolId, selectedClassId, selectedTestId]);
+
   // Pobranie Overview
   const fetchOverview = async () => {
     if (!selectedTestId) {
@@ -268,6 +318,7 @@ const Results: React.FC = () => {
       params.set("testId", String(selectedTestId));
       if (selectedSchoolId) params.set("schoolId", String(selectedSchoolId));
       if (selectedClassId) params.set("classId", String(selectedClassId));
+      if (selectedStudentId) params.set("studentId", String(selectedStudentId));
       const res = await axios.get<Overview>(
         `http://localhost:4000/results/overview?${params.toString()}`,
         {
@@ -275,6 +326,16 @@ const Results: React.FC = () => {
         }
       );
       setOverview(res.data);
+
+      if (!selectedStudentId) {
+        setStudentsForFilter(
+          (res.data.students || []).map((s) => ({
+            id: s.studentId,
+            firstName: s.firstName,
+            lastName: s.lastName,
+          }))
+        );
+      }
     } catch {
       setOverview(null);
       push({ type: "error", message: "Błąd analizy wyników." });
@@ -285,7 +346,7 @@ const Results: React.FC = () => {
 
   useEffect(() => {
     fetchOverview(); /* eslint-disable-next-line */
-  }, [selectedTestId, selectedSchoolId, selectedClassId]);
+  }, [selectedTestId, selectedSchoolId, selectedClassId, selectedStudentId]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const selectedSession = useMemo(
@@ -339,12 +400,51 @@ const Results: React.FC = () => {
   }, [overview, studentMetric]);
 
   // Eksport do natywnego Excela (XLSX) – zachowuje polskie znaki i typy liczb
-  const exportXLSX = () => {
+  const safeFileName = (name: string) =>
+    (name || "wyniki").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 120);
+
+  // r – 1-indeksowany względem AOA, c – 0-indeksowany (A=0, B=1, …)
+  const cellAddr = (r: number, c: number) =>
+    XLSX.utils.encode_cell({ r: r - 1, c });
+
+  // Jedno zapytanie o macierz punktów (szybciej niż po 1 uczniu).
+  // Jeśli backend nie ma jeszcze endpointu, niżej podaję jego krótką implementację.
+  async function fetchPointsMatrix(
+    token: string,
+    overview: Overview,
+    scope: {
+      schoolId?: number | "";
+      classId?: number | "";
+      studentId?: number | "";
+    }
+  ): Promise<{
+    orders: number[];
+    rows: {
+      studentId: number;
+      firstName: string;
+      lastName: string;
+      points: (number | null)[];
+    }[];
+  }> {
+    const params = new URLSearchParams();
+    params.set("testId", String(overview.header.testId));
+    if (scope.schoolId) params.set("schoolId", String(scope.schoolId));
+    if (scope.classId) params.set("classId", String(scope.classId));
+    if (scope.studentId) params.set("studentId", String(scope.studentId));
+
+    const url = `http://localhost:4000/results/points?${params.toString()}`;
+    const res = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.data;
+  }
+  const exportXLSX = async () => {
     if (!overview) return;
 
+    // ---------- ARKUSZ 1: „Wyniki” ----------
     const aoa: (string | number | null)[][] = [];
 
-    // ---- Sekcja nagłówka (meta) ----
+    // meta
     aoa.push(["Sesja", overview.header.testName]);
     aoa.push(["Szablon", overview.header.templateName]);
     aoa.push(["Uczniów (n)", overview.header.n]);
@@ -363,9 +463,7 @@ const Results: React.FC = () => {
 
     aoa.push([]);
     aoa.push(["UCZNIOWIE"]);
-
-    // ---- Uczniowie ----
-    const studentsHeaderRow = aoa.push([
+    const hdrRow = aoa.push([
       "Lp.",
       "Imię",
       "Nazwisko",
@@ -373,7 +471,7 @@ const Results: React.FC = () => {
       "Suma",
       "Wynik (%)",
     ]);
-    const studentsDataStart = studentsHeaderRow + 1;
+    const studentsStart = hdrRow + 1;
 
     overview.students.forEach((s, i) => {
       aoa.push([
@@ -381,17 +479,15 @@ const Results: React.FC = () => {
         s.firstName,
         s.lastName,
         s.className,
-        Number(s.total.toFixed(2)), // liczba
-        s.percent, // 0..1 – ustawimy format %
+        Number(s.total.toFixed(2)),
+        s.percent, // 0..1 — sformatujemy jako %
       ]);
     });
-    const studentsDataEnd = aoa.length;
+    const studentsEnd = aoa.length;
 
     aoa.push([]);
     aoa.push(["ZADANIA"]);
-
-    // ---- Zadania ----
-    const itemsHeaderRow = aoa.push([
+    const itemsHdr = aoa.push([
       "Nr",
       "Opis",
       "Min",
@@ -403,7 +499,7 @@ const Results: React.FC = () => {
       "Wariancja",
       "Moc różnicująca (r)",
     ]);
-    const itemsDataStart = itemsHeaderRow + 1;
+    const itemsStart = itemsHdr + 1;
 
     overview.items.forEach((it) => {
       aoa.push([
@@ -419,15 +515,14 @@ const Results: React.FC = () => {
         it.discrimination,
       ]);
     });
-    const itemsDataEnd = aoa.length;
+    const itemsEnd = aoa.length;
 
-    // ---- Arkusz i formatowanie komórek ----
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const ws1 = XLSX.utils.aoa_to_sheet(aoa);
 
-    // Szerokości kolumn (opcjonalnie)
-    ws["!cols"] = [
-      { wch: 24 }, // Lp./Nr
-      { wch: 24 }, // Imię / Opis (później opis jest szerszy)
+    // Kolumny (orientacyjnie — nie wpływa na dane)
+    ws1["!cols"] = [
+      { wch: 8 }, // Lp./Nr
+      { wch: 22 }, // Imię / Opis (opis i tak zajmie więcej)
       { wch: 22 }, // Nazwisko
       { wch: 16 }, // Klasa
       { wch: 12 }, // Suma / Min
@@ -436,55 +531,95 @@ const Results: React.FC = () => {
       { wch: 8 }, // p
       { wch: 8 }, // q
       { wch: 8 }, // f
+      { wch: 12 }, // Wariancja
+      { wch: 14 }, // r
     ];
 
-    // Helper do adresu komórki (r i c są 1-indeksowane względem AOA)
-    const addr = (r: number, c: number) =>
-      XLSX.utils.encode_cell({ r: r - 1, c });
-
-    // Formatowanie sekcji „Uczniowie”
-    for (let r = studentsDataStart; r <= studentsDataEnd - 1; r++) {
-      const totalCell = addr(r, 4); // kolumna "Suma" (0:A,1:B,2:C,3:D,4:E) -> index 4
-      const percentCell = addr(r, 5); // kolumna "Wynik (%)" -> index 5
-      if (ws[totalCell]) ws[totalCell].z = "0.00";
-      if (ws[percentCell]) {
-        ws[percentCell].z = "0.00%"; // prawdziwy format procentowy
-        // upewnij się, że to liczba
-        if (ws[percentCell].t !== "n") {
-          ws[percentCell].t = "n";
-          ws[percentCell].v = Number(ws[percentCell].v) || 0;
-        }
+    // Format liczbowy w sekcji „Uczniowie”
+    for (let r = studentsStart; r <= studentsEnd - 1; r++) {
+      const totalCell = cellAddr(r, 4); // kol. E (0=A)
+      const percentCell = cellAddr(r, 5); // kol. F
+      if (ws1[totalCell]) ws1[totalCell].z = "0.00";
+      if (ws1[percentCell]) {
+        ws1[percentCell].t = "n";
+        ws1[percentCell].z = "0.00%";
       }
     }
 
-    // Formatowanie sekcji „Zadania”
-    // Kolumny: 2:Min, 3:Max -> "0.00"
-    // 4:Śr.pkt, 5:p, 6:q, 7:f, 8:Wariancja, 9:Różnicowanie -> "0.0000"
-    for (let r = itemsDataStart; r <= itemsDataEnd; r++) {
+    // Format liczbowy w sekcji „Zadania”
+    for (let r = itemsStart; r <= itemsEnd; r++) {
       const setFmt = (c: number, fmt: string) => {
-        const a = addr(r, c);
-        if (ws[a]) ws[a].z = fmt;
+        const a = cellAddr(r, c);
+        if (ws1[a]) ws1[a].z = fmt;
       };
-      setFmt(2, "0.00");
-      setFmt(3, "0.00");
-      ["0.0000", "0.0000", "0.0000", "0.0000", "0.0000"].forEach((fmt, i) =>
-        setFmt(4 + i, fmt)
+      setFmt(2, "0.00"); // Min
+      setFmt(3, "0.00"); // Max
+      ["0.00", "0.0000", "0.0000", "0.0000", "0.0000", "0.0000"].forEach(
+        (fmt, i) => setFmt(4 + i, fmt)
       );
     }
 
-    // Workbook i zapis
+    // ---------- ARKUSZ 2: „Punkty” ----------
+    // jedno zapytanie o macierz (orders + rows[points])
+    let matrix: {
+      orders: number[];
+      rows: {
+        studentId: number;
+        firstName: string;
+        lastName: string;
+        points: (number | null)[];
+      }[];
+    };
+    try {
+      matrix = await fetchPointsMatrix(token as string, overview, {
+        schoolId: selectedSchoolId,
+        classId: selectedClassId,
+        studentId: selectedStudentId,
+      });
+    } catch {
+      // awaryjnie: jeżeli endpointu nie ma, zbuduj nagłówek z kolejności zadań i puste wiersze
+      matrix = {
+        orders: overview.items.map((i) => i.order),
+        rows: overview.students.map((s) => ({
+          studentId: s.studentId,
+          firstName: s.firstName,
+          lastName: s.lastName,
+          points: overview.items.map(() => null),
+        })),
+      };
+    }
+
+    const header2 = [
+      "Imię",
+      "Nazwisko",
+      ...matrix.orders.map((nr) => String(nr)),
+    ];
+    const rows2 = matrix.rows.map((r) => [
+      r.firstName,
+      r.lastName,
+      ...r.points.map((v) => (v == null ? "" : Number(v))),
+    ]);
+
+    const ws2 = XLSX.utils.aoa_to_sheet([header2, ...rows2]);
+    ws2["!cols"] = [
+      { wch: 22 }, // Imię
+      { wch: 24 }, // Nazwisko
+      ...matrix.orders.map(() => ({ wch: 8 })),
+    ];
+
+    // ---------- Skoroszyt ----------
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Wyniki");
-    const safeName = (overview.header.testName || "wyniki").replace(
-      /[^\w\d-_]+/g,
-      "_"
-    );
-    XLSX.writeFile(wb, `${safeName}.xlsx`, {
+    XLSX.utils.book_append_sheet(wb, ws1, "Wyniki");
+    XLSX.utils.book_append_sheet(wb, ws2, "Punkty");
+
+    XLSX.writeFile(wb, `${safeFileName(overview.header.testName)}.xlsx`, {
       bookType: "xlsx",
       compression: true,
     });
-
-    push({ type: "success", message: "Wyeksportowano plik XLSX." });
+    push({
+      type: "success",
+      message: "Wyeksportowano plik XLSX.",
+    });
   };
 
   return (
@@ -528,6 +663,7 @@ const Results: React.FC = () => {
                   if (val) q.set("school", String(val));
                   else q.delete("school");
                   q.delete("class");
+                  q.delete("student");
                   navigate(`/results?${q.toString()}`);
                 }}
               >
@@ -565,6 +701,7 @@ const Results: React.FC = () => {
                   else q.delete("class");
                   if (selectedSchoolId)
                     q.set("school", String(selectedSchoolId));
+                  q.delete("student");
                   navigate(`/results?${q.toString()}`);
                 }}
                 disabled={!selectedSchoolId}
@@ -573,6 +710,49 @@ const Results: React.FC = () => {
                 {classes.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-500">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </span>
+            </div>
+            {/* Uczeń */}
+            <div className="relative inline-block">
+              <select
+                className="border border-gray-300 rounded-lg px-3 pr-10 py-2 bg-white font-medium text-sm focus:outline-none focus:border-teal-400 w-[260px] truncate appearance-none"
+                value={selectedStudentId}
+                onChange={(e) => {
+                  const val = e.target.value ? Number(e.target.value) : "";
+                  setSelectedStudentId(val);
+                  const q = new URLSearchParams(location.search);
+                  if (selectedSchoolId)
+                    q.set("school", String(selectedSchoolId));
+                  else q.delete("school");
+                  if (selectedClassId) q.set("class", String(selectedClassId));
+                  else q.delete("class");
+                  if (selectedTestId) q.set("test", String(selectedTestId));
+                  else q.delete("test");
+                  if (val) q.set("student", String(val));
+                  else q.delete("student");
+                  navigate(`/results?${q.toString()}`);
+                }}
+                disabled={!selectedClassId}
+                title="Filtruj po uczniu"
+              >
+                <option value="">Wszyscy uczniowie</option>
+                {studentsForFilter.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.firstName} {u.lastName}
                   </option>
                 ))}
               </select>
