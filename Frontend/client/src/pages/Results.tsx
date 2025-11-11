@@ -26,7 +26,9 @@ type ItemStat = {
   minPoints: number;
   maxPoints: number;
   avgPoints: number;
-  p: number; q: number; f: number;
+  p: number;
+  q: number;
+  f: number;
   variance: number;
   discrimination: number;
 };
@@ -550,10 +552,13 @@ const Results: React.FC = () => {
 
     // ---------- ARKUSZ 2: „Punkty” (fallback: po 1 zapytaniu na ucznia) ----------
     const taskCount = overview.items.length;
+    const tasksOrdered = [...overview.items].sort((a, b) => a.order - b.order);
     const header2 = [
       "Imię",
       "Nazwisko",
-      ...Array.from({ length: taskCount }, (_, i) => `${i + 1}`),
+      ...tasksOrdered.map((t) =>
+        t.name && t.name.trim() ? t.name : String(t.order)
+      ),
     ];
 
     type TaskRes = { tasks: { order: number; points: number | null }[] };
@@ -568,13 +573,13 @@ const Results: React.FC = () => {
           res.data.tasks.forEach((t) => {
             byOrder[t.order] = t.points;
           });
-          const cols = Array.from({ length: taskCount }, (_, i) => {
-            const v = byOrder[i + 1];
+          const cols = tasksOrdered.map((t) => {
+            const v = byOrder[t.order];
             return v === null || v === undefined ? "" : Number(v);
           });
           return [s.firstName, s.lastName, ...cols];
         } catch {
-          return [s.firstName, s.lastName, ...Array(taskCount).fill("")];
+          return [s.firstName, s.lastName, ...Array(taskCount).fill("-")];
         }
       })
     );
@@ -702,7 +707,7 @@ const Results: React.FC = () => {
             {/* Uczeń */}
             <div className="relative inline-block">
               <select
-                className="border border-gray-300 rounded-lg px-3 pr-10 py-2 bg-white font-medium text-sm focus:outline-none focus:border-teal-400 w-[260px] truncate appearance-none"
+                className="border border-gray-300 rounded-lg px-3 pr-10 py-2 bg-white font-medium text-sm focus:outline-none focus:border-teal-400 w-[180px] truncate appearance-none"
                 value={selectedStudentId}
                 onChange={(e) => {
                   const val = e.target.value ? Number(e.target.value) : "";
