@@ -3,16 +3,16 @@ import React from "react";
 export const ICON_CLASSES = "w-5 h-5 transition-colors duration-150";
 
 export const linksMain = [
-  {
-    name: "Dashboard",
-    to: "/dashboard",
-    icon: (
-      <svg className={ICON_CLASSES} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-        <rect x="3" y="7" width="18" height="13" rx="2" />
-        <path d="M16 3v4M8 3v4" />
-      </svg>
-    ),
-  },
+  // {
+  //   name: "Dashboard",
+  //   to: "/dashboard",
+  //   icon: (
+  //     <svg className={ICON_CLASSES} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+  //       <rect x="3" y="7" width="18" height="13" rx="2" />
+  //       <path d="M16 3v4M8 3v4" />
+  //     </svg>
+  //   ),
+  // },
   {
     name: "Schools",
     to: "/schools",
