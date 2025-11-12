@@ -727,9 +727,8 @@ const ImportFromResults: React.FC = () => {
                         onChange={(e) => setNewTemplateName(e.target.value)}
                       />
                       <div className="text-[11px] text-gray-500 mt-1">
-                        Treść i czynność mogą się różnić dla każdego zadania —
-                        pobieramy je z wybranych kolumn CSV, pionowo: i-ta
-                        niepusta komórka → zadanie i.
+                        Treść i czynność (jeśli wskażesz kolumny poniżej) zostaną
+                        zapisane w zadaniach szablonu.
                       </div>
                     </div>
                   )}
@@ -768,8 +767,7 @@ const ImportFromResults: React.FC = () => {
                     </span>
                   </div>
                   <div className="text-[11px] text-gray-500 mt-1">
-                    Wyniki zostaną przypisane do tej szkoły (walidacje
-                    duplikatów po stronie backendu).
+                    Wyniki zostaną przypisane do tej szkoły (jeśli klasy istnieją w danej szkole - nie zostaną ponownie utworzone). Zostanie stworzony jedynie nowy test z istniejącego, bądź nowego szablonu.
                   </div>
                 </div>
               </div>
