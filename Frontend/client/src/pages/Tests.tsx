@@ -5,6 +5,7 @@ import axios from "axios";
 import Sidebar from "../components/Sidebar/Sidebar";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useToast } from "../components/Toast";
+import CsvImportWizard from "../components/CsvImportWizard";
 
 type School = { id: number; name: string };
 type SchoolClass = { id: number; name: string; schoolId: number };
@@ -528,6 +529,7 @@ const Tests: React.FC = () => {
             <h2 className="text-2xl font-bold text-[#222B45]">
               Twoje sesje testów
             </h2>
+            <CsvImportWizard />
             <button
               onClick={() => setShowSessionModal(true)}
               className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"

@@ -8,12 +8,14 @@ import studentRoutes from "./routes/studentRoutes";
 import testTemplateRoutes from "./routes/testTemplateRoutes";
 import testsRoutes from "./routes/testsRoutes";
 import resultsRoutes from "./routes/resultsRoutes";
+import importsCsvRoutes from "./routes/importsCsvRoutes";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use("/auth", authRoutes);
 app.use("/api", protectedRoutes);
+app.use("/imports", importsCsvRoutes);
 app.use("/schools", schoolRoutes);
 app.use("/test-templates", testTemplateRoutes);
 app.use("/", classRoutes);
