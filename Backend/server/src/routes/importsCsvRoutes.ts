@@ -12,8 +12,27 @@ const router = express.Router();
  *   classNameMap?: Record<string,string>,
  *   test: { name: string, date: string },
  *   templateId?: number,
- *   templateNew?: { name: string, items: { name: string, order: number, maxPoints: number, minPoints?: number, content?: string|null, activity?: string|null, step?: number }[] },
- *   rows: Array<{ className?: string|null, roll?: number|null, firstName?: string|null, lastName?: string|null, gender?: string|null, taskPoints: (number|null)[] }>
+ *   templateNew?: {
+ *     name: string,
+ *     items: {
+ *       name: string,
+ *       order: number,
+ *       maxPoints: number,
+ *       minPoints?: number,
+ *       content?: string|null,
+ *       activity?: string|null,
+ *       allowHalfPoints?: boolean,   // preferowane pole
+ *       step?: number                // (DEPRECATED) jeśli = 0.5 => allowHalfPoints = true
+ *     }[]
+ *   },
+ *   rows: Array<{
+ *     className?: string|null,
+ *     roll?: number|null,
+ *     firstName?: string|null,
+ *     lastName?: string|null,
+ *     gender?: string|null,
+ *     taskPoints: (number|null)[]
+ *   }>
  * }
  */
 router.post("/csv", authenticateJWT, async (req: Request, res: Response): Promise<void> => {
@@ -32,7 +51,16 @@ router.post("/csv", authenticateJWT, async (req: Request, res: Response): Promis
     templateId?: number;
     templateNew?: {
       name: string;
-      items: { name: string; order: number; maxPoints: number; minPoints?: number; content?: string|null; activity?: string|null; step?: number }[];
+      items: {
+        name: string;
+        order: number;
+        maxPoints: number;
+        minPoints?: number;
+        content?: string | null;
+        activity?: string | null;
+        allowHalfPoints?: boolean;
+        step?: number; // deprecated
+      }[];
     };
     rows: {
       className?: string | null;
@@ -85,16 +113,27 @@ router.post("/csv", authenticateJWT, async (req: Request, res: Response): Promis
         name: templateNew.name || `Szablon z CSV ${new Date().toLocaleString()}`,
         ownerId: userId,
         tasks: {
-          create: templateNew.items.map((it) => ({
-            name: it.name,
-            order: it.order,
-            minPoints: it.minPoints ?? 0,
-            maxPoints: it.maxPoints,
-            content: it.content ?? it.name,
-            activity: it.activity ?? null,
-            // jeżeli w modelu jest pole step — zapisz; jeśli nie, usuń tę linię
-            step: it.step ?? 1,
-          })),
+          create: templateNew.items.map((it) => {
+            // kompatybilność: jeśli klient przyśle "step: 0.5" => allowHalfPoints = true
+            const allowHalf =
+              typeof it.allowHalfPoints === "boolean"
+                ? it.allowHalfPoints
+                : Number((it as any).step) === 0.5;
+
+            const minP = it.minPoints ?? 0;
+            const maxP = Math.max(it.maxPoints, minP);
+
+            return {
+              name: it.name,
+              order: it.order,
+              minPoints: minP,
+              maxPoints: maxP,
+              content: it.content ?? it.name,
+              activity: it.activity ?? null,
+              allowHalfPoints: allowHalf,
+              // UWAGA: nie zapisujemy "step" do Prisma — w modelu go nie ma
+            };
+          }),
         },
       },
       include: { tasks: true },

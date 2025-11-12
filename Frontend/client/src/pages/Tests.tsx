@@ -678,7 +678,7 @@ const Tests: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between">
                     <h3 className="font-bold text-lg">
                       Wyniki —{" "}
                       {
@@ -694,8 +694,12 @@ const Tests: React.FC = () => {
                       Sesja:{" "}
                       <span className="font-semibold">{sessionName}</span>
                     </div>
+                    
                   </div>
-
+                  <div className="mb-2">
+                      <span className="text-xs text-gray-500 font-semibold" >Jeżeli zadanie zostało opuszczone - pozostaw wartość pustą</span>
+                  </div>
+                      
                   <div className="flex flex-col gap-3 overflow-y-auto max-h-[53vh]">
                     {tasks.map((t, idx) => {
                       const err = taskErrors[t.id];

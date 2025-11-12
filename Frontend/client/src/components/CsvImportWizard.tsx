@@ -63,6 +63,46 @@ const halfLike = (v: number) =>
 
 const defaultGender = "N";
 
+const pickFirstNonEmpty = (rows: any[], header?: string) => {
+  if (!header) return "";
+  for (const r of rows) {
+    const v = norm(r[header]);
+    if (v) return v;
+  }
+  return "";
+};
+
+// <<< KLUCZOWE: wartości per-zadanie z jednej kolumny, pionowo (i-ta niepusta komórka -> zadanie i) >>>
+const perTaskFromVerticalColumn = (
+  header: string | undefined,
+  tasksCount: number,
+  rows: Array<Record<string, any>>
+): (string | undefined)[] => {
+  const out: (string | undefined)[] = Array(tasksCount).fill(undefined);
+  if (!header) return out;
+
+  let k = 0;
+  for (const r of rows) {
+    const v = norm(r[header]);
+    if (!v) continue;
+    if (k < tasksCount) {
+      out[k] = v;
+      k++;
+      if (k >= tasksCount) break;
+    }
+  }
+
+  // Fallback: jeśli nadal puste — użyj pierwszej niepustej wartości dla wszystkich
+  if (out.every((x) => x == null)) {
+    const single = pickFirstNonEmpty(rows, header);
+    if (single) {
+      for (let i = 0; i < tasksCount; i++) out[i] = single;
+    }
+  }
+
+  return out;
+};
+
 const ImportFromResults: React.FC = () => {
   const { push } = useToast();
   const [open, setOpen] = useState(false);
@@ -192,14 +232,6 @@ const ImportFromResults: React.FC = () => {
   }, [selectedTemplateName, mode]);
 
   // --- CSV parsing + automapping
-  const pickFirstNonEmpty = (rows: any[], header: string) => {
-    for (const r of rows) {
-      const v = norm(r[header]);
-      if (v) return v;
-    }
-    return "";
-  };
-
   const suggestName = (headers: string[], rows: any[]) => {
     const L = headers.map((h) => lower(h));
     const find = (...regs: RegExp[]) => {
@@ -382,29 +414,19 @@ const ImportFromResults: React.FC = () => {
         }
       }
 
-      // Treść/Czynność — najczęstsza wartość w kolumnie (jeśli wybrano)
-      const mostCommon = (col?: string) => {
-        if (!col) return undefined;
-        const map = new Map<string, number>();
-        for (const r of parsed.rows) {
-          const v = norm(r[col]);
-          if (!v) continue;
-          map.set(v, (map.get(v) || 0) + 1);
-        }
-        let best: string | undefined;
-        let cnt = 0;
-        for (const [k, n] of map.entries()) {
-          if (n > cnt) {
-            best = k;
-            cnt = n;
-          }
-        }
-        return best;
-      };
-      const commonContent = mostCommon(mapping.taskContentCol);
-      const commonActivity = mostCommon(mapping.taskActivityCol);
+      // Treść/Czynność — PER ZADANIE z jednej kolumny (pionowo: i-ta niepusta komórka -> zadanie i)
+      const contentByTask = perTaskFromVerticalColumn(
+        mapping.taskContentCol,
+        taskHeaders.length,
+        parsed.rows
+      );
+      const activityByTask = perTaskFromVerticalColumn(
+        mapping.taskActivityCol,
+        taskHeaders.length,
+        parsed.rows
+      );
 
-      // Wiersze
+      // Wiersze (uczniowie + punkty)
       const payloadRows = parsed.rows.map((r) => {
         const className = norm(r[mapping.classCol!]);
         const rollRaw = mapping.journalCol
@@ -453,9 +475,11 @@ const ImportFromResults: React.FC = () => {
             order: idx + 1,
             maxPoints: maxima[idx] || 1,
             minPoints: 0,
-            content: (commonContent && norm(commonContent)) || undefined,
-            activity: (commonActivity && norm(commonActivity)) || undefined,
-            step: halves[idx] ? 0.5 : 1,
+            // per-zadanie:
+            content: contentByTask[idx] ?? undefined,
+            activity: activityByTask[idx] ?? undefined,
+            // brak pola step w modelu — nie wysyłamy
+            allowHalfPoints: !!halves[idx],
           })),
         };
       }
@@ -703,8 +727,9 @@ const ImportFromResults: React.FC = () => {
                         onChange={(e) => setNewTemplateName(e.target.value)}
                       />
                       <div className="text-[11px] text-gray-500 mt-1">
-                        Treść i czynność (jeśli wskażesz kolumny poniżej) zostaną
-                        zapisane w zadaniach szablonu.
+                        Treść i czynność mogą się różnić dla każdego zadania —
+                        pobieramy je z wybranych kolumn CSV, pionowo: i-ta
+                        niepusta komórka → zadanie i.
                       </div>
                     </div>
                   )}
@@ -1008,7 +1033,7 @@ const ImportFromResults: React.FC = () => {
               {parsed && miniPreviewHeaders.length > 0 && (
                 <div className="bg-white rounded-xl border border-gray-100 p-4">
                   <div className="font-bold mb-3">
-                    Mini-podgląd mapowania (3 pierwsze wiersze)
+                    Podgląd mapowania (3 pierwsze wiersze)
                   </div>
                   <div className="overflow-x-auto">
                     <table className="min-w-full">
