@@ -1,386 +1,1087 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useMemo, useRef, useState } from "react";
-import Papa from "papaparse";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import * as Papa from "papaparse";
 import axios from "axios";
 import { useToast } from "./Toast";
 
+const API = "http://localhost:4000";
+
+// Ujednolicona wysokość selecta i caret jak w reszcie aplikacji
+const clsSelect =
+  "h-10 border border-gray-300 rounded-lg px-3 pr-10 bg-white font-medium text-sm focus:outline-none focus:border-teal-400 truncate appearance-none";
+const clsInput =
+  "border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm focus:outline-none focus:border-teal-400";
+const clsLabel = "text-xs font-semibold text-gray-500 mb-1";
+const caret =
+  "pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500";
+
+const auth = () => ({
+  headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+});
+
+type TemplateLite = { id: number; name: string; tasksCount?: number };
 type School = { id: number; name: string };
 
-const normalize = (s: string) =>
-  s
-    .normalize("NFKD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .trim();
-
-const CAND = {
-  class: ["oddzial", "odzial", "klasa", "class", "oddział"],
-  roll: ["nr w dzienniku", "nr", "lp", "numer", "no", "number"],
-  first: ["imie", "imiona", "first name", "first"],
-  last: ["nazwisko", "last name", "last", "surname"],
-  pesel: ["pesel", "nr dokumentu", "document", "id"],
-  sum: ["suma punktow", "suma punktów", "suma", "total"],
-  pct: ["procent", "procent punktow", "procent punktów", "percent"],
+type TaskMapRow = { header: string; taskName: string };
+type Mapping = {
+  classCol?: string;
+  journalCol?: string;
+  firstNameCol?: string;
+  lastNameCol?: string;
+  genderCol?: string;
+  taskContentCol?: string;
+  taskActivityCol?: string;
+  tasks: TaskMapRow[];
 };
 
-const isTaskHeader = (h: string) => /^[0-9]+([_\-][A-Za-z0-9]+)?$/.test(h.trim());
-
-const numOrNull = (v: any): number | null => {
-  if (v === null || v === undefined) return null;
-  const s = String(v).trim();
-  if (!s || s === "?" || s === "-") return null;
-  const n = Number(s.replace(",", "."));
-  return Number.isFinite(n) ? n : null;
+type Parsed = {
+  headers: string[];
+  rows: Array<Record<string, any>>;
+  delimiter: string;
 };
 
-const CsvImportWizard: React.FC = () => {
+const guessDelimiter = (txt: string) => {
+  const semis = (txt.match(/;/g) || []).length;
+  const commas = (txt.match(/,/g) || []).length;
+  return semis > commas ? ";" : ",";
+};
+
+const norm = (s: any) => (s ?? "").toString().trim();
+const lower = (s: string) => norm(s).toLowerCase();
+
+const looksLikeTask = (h: string) => {
+  const x = norm(h);
+  if (/^\d+$/.test(x)) return true;
+  if (/^\d+[A-Za-z]+$/.test(x)) return true;
+  if (/^\d+(?:\.\d+)+$/.test(x)) return true;
+  if (/^\d+(_[A-Za-z0-9]+)+$/.test(x)) return true;
+  return false;
+};
+
+const halfLike = (v: number) =>
+  Math.abs(v * 2 - Math.round(v * 2)) < 1e-9 && Math.round(v * 2) % 2 === 1;
+
+const defaultGender = "N";
+
+const ImportFromResults: React.FC = () => {
   const { push } = useToast();
-
-  const [schools, setSchools] = useState<School[]>([]);
-  const [schoolId, setSchoolId] = useState<number | "">("");
-
-  const [fileName, setFileName] = useState<string>("");
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [rows, setRows] = useState<any[]>([]);
-
-  const [colClass, setColClass] = useState<string>("");
-  const [colRoll, setColRoll] = useState<string>("");
-  const [colFirst, setColFirst] = useState<string>("");
-  const [colLast, setColLast] = useState<string>("");
-  const [colPesel, setColPesel] = useState<string>("");
-
-  const [taskCols, setTaskCols] = useState<string[]>([]);
-  const [useExistingTemplate, setUseExistingTemplate] = useState<boolean>(false);
-  const [templateId, setTemplateId] = useState<number | "">("");
-  const [templateName, setTemplateName] = useState<string>("Szablon z CSV");
-  const [testName, setTestName] = useState<string>("Test z CSV");
-  const [testDate, setTestDate] = useState<string>(new Date().toISOString().slice(0, 10));
-
+  const [open, setOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const res = await axios.get<School[]>("http://localhost:4000/schools", {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
-        setSchools(res.data);
-      } catch {
-        push({ type: "error", message: "Nie udało się pobrać szkół." });
-      }
-    })();
-  }, [push]);
+  const [parsed, setParsed] = useState<Parsed | null>(null);
+  const [mapping, setMapping] = useState<Mapping>({ tasks: [] });
 
-  const autoDetect = (hs: string[]) => {
-    const N = hs.map((h) => normalize(h));
-    const pick = (cands: string[]) => {
-      const i = N.findIndex((n) => cands.some((c) => n.includes(c)));
-      return i >= 0 ? hs[i] : "";
-    };
-    setColClass(pick(CAND.class));
-    setColRoll(pick(CAND.roll));
-    setColFirst(pick(CAND.first));
-    setColLast(pick(CAND.last));
-    setColPesel(pick(CAND.pesel));
+  const [testName, setTestName] = useState<string>("");
+  const [rawNameFromCsv, setRawNameFromCsv] = useState<string>("");
 
-    const guessedTasks = hs.filter((h) => isTaskHeader(String(h).trim()));
-    setTaskCols(guessedTasks);
+  const [mode, setMode] = useState<"existing" | "new">("existing");
+  const [templates, setTemplates] = useState<TemplateLite[]>([]);
+  const [selectedTemplateName, setSelectedTemplateName] = useState<string>("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | undefined>(undefined);
+  const [selectedTemplateCount, setSelectedTemplateCount] = useState<number | undefined>(undefined);
+  const [newTemplateName, setNewTemplateName] = useState<string>("");
+
+  const [schools, setSchools] = useState<School[]>([]);
+  const [targetSchoolId, setTargetSchoolId] = useState<number | "">("");
+
+  const [existingTestNames, setExistingTestNames] = useState<string[]>([]);
+  const testNameTaken = useMemo(
+    () => !!testName && existingTestNames.some((n) => n.toLowerCase() === testName.toLowerCase()),
+    [existingTestNames, testName]
+  );
+
+  // --- słowniki
+  const tryFetch = async <T,>(url: string): Promise<T | null> => {
+    try {
+      const res = await axios.get<T>(url, auth());
+      return res.data as any;
+    } catch {
+      return null;
+    }
   };
 
-  const openFile = () => fileRef.current?.click();
+  const fetchTemplates = async () => {
+    const candidates = [
+      `${API}/test-templates`,
+      `${API}/templates`,
+      `${API}/templates/list`,
+      `${API}/testTemplates`,
+    ];
+    let data: any[] = [];
+    for (const u of candidates) {
+      const r = await tryFetch<any[]>(u);
+      if (Array.isArray(r) && r.length) {
+        data = r;
+        break;
+      }
+    }
+    const map = new Map<string, TemplateLite>();
+    (data || []).forEach((t: any) => {
+      const id = t.id ?? t.templateId ?? t?.template?.id;
+      const name = t.name ?? t?.template?.name;
+      const tasks = t.tasks ?? t?.template?.tasks;
+      if (!id || !name) return;
+      if (!map.has(name))
+        map.set(name, {
+          id,
+          name,
+          tasksCount: Array.isArray(tasks) ? tasks.length : undefined,
+        });
+    });
+    if (!map.size) {
+      const tests = await tryFetch<any[]>(`${API}/tests`);
+      (tests || []).forEach((x) => {
+        const id = x?.template?.id;
+        const name = x?.template?.name;
+        const tasks = x?.template?.tasks;
+        if (id && name && !map.has(name))
+          map.set(name, { id, name, tasksCount: tasks?.length });
+      });
+    }
+    setTemplates([...map.values()]);
+  };
 
-  const onFile: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+  const fetchTemplateByName = async (name: string) => {
+    setSelectedTemplateCount(undefined);
+    setSelectedTemplateId(undefined);
+    try {
+      const res = await axios.get<any>(`${API}/templates/by-name`, {
+        params: { name },
+        ...auth(),
+      });
+      if (res?.data?.id) setSelectedTemplateId(res.data.id);
+      if (res?.data?.tasks?.length != null)
+        setSelectedTemplateCount(res.data.tasks.length);
+      return;
+    } catch {
+      /* ignore */
+    }
+    const t = templates.find((x) => x.name === name);
+    setSelectedTemplateId(t?.id);
+    setSelectedTemplateCount(t?.tasksCount);
+  };
+
+  const fetchSchools = async () => {
+    const data = await tryFetch<School[]>(`${API}/schools`);
+    setSchools(data || []);
+  };
+
+  const fetchTestsNames = async () => {
+    const data = await tryFetch<any[]>(`${API}/tests`);
+    const names = (data || [])
+      .map((t) => String(t?.name || ""))
+      .filter(Boolean);
+    setExistingTestNames(Array.from(new Set(names)));
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    fetchTemplates();
+    fetchSchools();
+    fetchTestsNames();
+  }, [open]);
+
+  useEffect(() => {
+    if (mode === "existing" && selectedTemplateName) {
+      fetchTemplateByName(selectedTemplateName);
+    } else {
+      setSelectedTemplateCount(undefined);
+      setSelectedTemplateId(undefined);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTemplateName, mode]);
+
+  // --- CSV parsing + automapping
+  const pickFirstNonEmpty = (rows: any[], header: string) => {
+    for (const r of rows) {
+      const v = norm(r[header]);
+      if (v) return v;
+    }
+    return "";
+  };
+
+  const suggestName = (headers: string[], rows: any[]) => {
+    const L = headers.map((h) => lower(h));
+    const find = (...regs: RegExp[]) => {
+      const i = L.findIndex((h) => regs.some((r) => r.test(h)));
+      return i >= 0 ? headers[i] : undefined;
+    };
+    const hTemat = find(/^temat$/);
+    const hNazwa = find(/^nazwa egzaminu$/);
+    const hTyp = find(/^typ arkusza$/);
+    const hKod = find(/^kod arkusza$/);
+
+    const temat = hTemat ? pickFirstNonEmpty(rows, hTemat) : "";
+    if (temat) return temat;
+
+    const nazwa = hNazwa ? pickFirstNonEmpty(rows, hNazwa) : "";
+    if (nazwa) return nazwa;
+
+    const typ = hTyp ? pickFirstNonEmpty(rows, hTyp) : "";
+    const kod = hKod ? pickFirstNonEmpty(rows, hKod) : "";
+    if (typ || kod) return [typ, kod].filter(Boolean).join(" — ");
+
+    const d = new Date();
+    return `Test z CSV ${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  const autoMap = (
+    headers: string[],
+    rows: Array<Record<string, any>>
+  ) => {
+    const L = headers.map((h) => lower(h));
+    const find = (...cands: RegExp[]) => {
+      const idx = L.findIndex((h) => cands.some((r) => r.test(h)));
+      return idx >= 0 ? headers[idx] : undefined;
+    };
+
+    const sug = suggestName(headers, rows);
+    setRawNameFromCsv(sug);
+    if (!norm(testName)) setTestName(sug);
+
+    const classCol = find(/^(oddział|oddzial|klasa)$/);
+    const journalCol = find(
+      /^(nr w dzienniku|numer w dzienniku|dziennik|kod|id|lp)$/
+    );
+    const firstNameCol = find(/^(imiona|imię|imie|first ?name)$/);
+    const lastNameCol = find(/^(nazwisko|last ?name)$/);
+    const genderCol = find(/^(płeć|plec|gender|sex)$/);
+
+    const taskContentCol = find(/^(treść zadania|tresc zadania|opis|temat)$/);
+    const taskActivityCol = find(
+      /^(czynność|czynnosc|opis czynności|opis czynnosc)$/
+    );
+
+    const banned = new Set(
+      [
+        classCol,
+        journalCol,
+        firstNameCol,
+        lastNameCol,
+        genderCol,
+        taskContentCol,
+        taskActivityCol,
+      ].filter(Boolean) as string[]
+    );
+    const hinted = headers.filter((h) => !banned.has(h) && looksLikeTask(h));
+    const tasks: TaskMapRow[] = hinted.length
+      ? hinted.map((h) => ({ header: h, taskName: norm(h) }))
+      : headers
+          .filter((h) => !banned.has(h))
+          .slice(0, 3)
+          .map((h) => ({ header: h, taskName: norm(h) }));
+
+    setMapping({
+      classCol,
+      journalCol,
+      firstNameCol,
+      lastNameCol,
+      genderCol,
+      taskContentCol,
+      taskActivityCol,
+      tasks,
+    });
+  };
+
+  const onPickFile: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    setFileName(f.name);
-    Papa.parse(f, {
+    const txt = await f.text();
+    const delimiter = guessDelimiter(txt);
+    const res = Papa.parse(txt, {
       header: true,
-      skipEmptyLines: true,
-      transformHeader: (h) => h?.trim(),
-      complete: (res: any) => {
-        const hs = res.meta.fields || [];
-        setHeaders(hs);
-        setRows(res.data as any[]);
-        autoDetect(hs);
-      },
-      error: () => push({ type: "error", message: "Błąd parsowania CSV." }),
+      delimiter,
+      skipEmptyLines: "greedy",
     });
-    e.currentTarget.value = "";
+    if (res.errors?.length) {
+      push({ type: "error", message: `Błąd CSV: ${res.errors[0].message}` });
+      return;
+    }
+    const headers = (res.meta.fields || []).map(String);
+    const rows = (res.data as any[]).map((r) => r || {});
+    if (!headers.length || !rows.length) {
+      push({ type: "error", message: "Plik jest pusty lub bez nagłówka." });
+      return;
+    }
+    setParsed({ headers, rows, delimiter });
+    autoMap(headers, rows);
   };
 
-  // Szacun max-ów i półpunktów
-  const autoTemplateItems = useMemo(() => {
-    const items = taskCols.map((h, i) => {
-      let max = 0;
-      let half = false;
-      for (const r of rows) {
-        const v = numOrNull(r[h]);
-        if (v == null) continue;
-        if (v % 1 !== 0) half = true;
-        if (v > max) max = v;
-      }
-      return {
-        name: h,
-        order: i + 1,
-        maxPoints: max || 1,
-        minPoints: 0,
-        step: half ? 0.5 : 1,
-      };
-    });
-    return items;
-  }, [rows, taskCols]);
+  const headerOptions = useMemo(() => parsed?.headers || [], [parsed]);
 
-  const importNow = async () => {
-    if (!schoolId) {
-      push({ type: "error", message: "Wybierz szkołę." });
-      return;
+  const canImport = useMemo(() => {
+    if (!parsed) return false;
+    if (!mapping.tasks.length) return false;
+    if (!mapping.firstNameCol && !mapping.lastNameCol && !mapping.journalCol)
+      return false;
+    if (!norm(testName) || testNameTaken) return false;
+    if (!targetSchoolId) return false;
+    if (!mapping.classCol) return false;
+
+    if (
+      mode === "existing" &&
+      selectedTemplateName &&
+      selectedTemplateCount != null
+    ) {
+      if (selectedTemplateCount !== mapping.tasks.length) return false;
     }
-    if (!taskCols.length) {
-      push({ type: "error", message: "Wybierz przynajmniej jedną kolumnę zadania." });
-      return;
-    }
+    if (mode === "new" && !norm(newTemplateName)) return false;
 
-    // zbuduj wiersze
-    const payloadRows = rows.map((r) => {
-      const className = String(r[colClass] ?? "").trim();
-      const roll = numOrNull(r[colRoll]);
-      const firstName = (r[colFirst] ?? "").toString().trim();
-      const lastName = (r[colLast] ?? "").toString().trim();
-      const pesel = (r[colPesel] ?? "").toString().trim();
-      const gender = "N"; // domyślnie N (nieznana)
+    return true;
+  }, [
+    parsed,
+    mapping,
+    testName,
+    testNameTaken,
+    mode,
+    selectedTemplateName,
+    selectedTemplateCount,
+    targetSchoolId,
+    newTemplateName,
+  ]);
 
-      const taskPoints = taskCols.map((h) => numOrNull(r[h]));
-      return { pesel, className, roll, firstName, lastName, gender, taskPoints };
-    });
+  const templateMismatch =
+    mode === "existing" &&
+    selectedTemplateName &&
+    selectedTemplateCount != null &&
+    parsed &&
+    selectedTemplateCount !== mapping.tasks.length;
 
-    const body: any = {
-      schoolId,
-      classNameMap: {}, // tu można dodać mapowanie "A"->"3A" jeśli chcesz, zostawiam puste
-      test: { name: testName || "Test z CSV", date: testDate },
-      rows: payloadRows,
-    };
-
-    if (useExistingTemplate && templateId) {
-      body.templateId = Number(templateId);
-    } else {
-      body.templateNew = {
-        name: templateName || "Szablon z CSV",
-        items: autoTemplateItems.map((it) => ({
-          name: it.name,
-          order: it.order,
-          maxPoints: it.maxPoints,
-          minPoints: it.minPoints,
-        })),
-      };
-    }
+  // --- Import ---
+  const submit = async () => {
+    if (!parsed) return;
 
     try {
-      const res = await axios.post("http://localhost:4000/imports/csv", body, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      const schoolId = Number(targetSchoolId);
+      const taskHeaders = mapping.tasks.map((t) => t.header);
+
+      // Dla nowego szablonu: maxima + połówki
+      const maxima: number[] = Array.from(
+        { length: taskHeaders.length },
+        () => 0
+      );
+      const halves: boolean[] = Array.from(
+        { length: taskHeaders.length },
+        () => false
+      );
+
+      if (mode === "new") {
+        for (let i = 0; i < taskHeaders.length; i++) {
+          const h = taskHeaders[i];
+          for (const r of parsed.rows) {
+            const vRaw = r[h];
+            if (vRaw === null || vRaw === undefined) continue;
+            const v = Number(String(vRaw).replace(",", "."));
+            if (!Number.isFinite(v)) continue;
+            if (v > maxima[i]) maxima[i] = v;
+            if (halfLike(v)) halves[i] = true;
+          }
+        }
+      }
+
+      // Treść/Czynność — najczęstsza wartość w kolumnie (jeśli wybrano)
+      const mostCommon = (col?: string) => {
+        if (!col) return undefined;
+        const map = new Map<string, number>();
+        for (const r of parsed.rows) {
+          const v = norm(r[col]);
+          if (!v) continue;
+          map.set(v, (map.get(v) || 0) + 1);
+        }
+        let best: string | undefined;
+        let cnt = 0;
+        for (const [k, n] of map.entries()) {
+          if (n > cnt) {
+            best = k;
+            cnt = n;
+          }
+        }
+        return best;
+      };
+      const commonContent = mostCommon(mapping.taskContentCol);
+      const commonActivity = mostCommon(mapping.taskActivityCol);
+
+      // Wiersze
+      const payloadRows = parsed.rows.map((r) => {
+        const className = norm(r[mapping.classCol!]);
+        const rollRaw = mapping.journalCol
+          ? Number(String(r[mapping.journalCol]).replace(",", "."))
+          : NaN;
+        const roll = Number.isFinite(rollRaw) ? rollRaw : null;
+        const firstName = mapping.firstNameCol
+          ? norm(r[mapping.firstNameCol])
+          : "";
+        const lastName = mapping.lastNameCol ? norm(r[mapping.lastNameCol]) : "";
+        const gender = mapping.genderCol
+          ? norm(r[mapping.genderCol]) || defaultGender
+          : defaultGender;
+
+        const taskPoints = mapping.tasks.map((t) => {
+          const val = r[t.header];
+          if (val === null || val === undefined) return null;
+          const n = Number(String(val).replace(",", "."));
+          return Number.isFinite(n) ? n : null;
+        });
+
+        return { className, roll, firstName, lastName, gender, taskPoints };
       });
-      push({
-        type: "success",
-        message: `Zaimportowano. Klasy: ${res.data.classes}, uczniowie: ${res.data.students}, wyników: ${res.data.results}.`,
-      });
+
+      const body: any = {
+        schoolId,
+        classNameMap: {},
+        test: { name: norm(testName), date: new Date().toISOString().slice(0, 10) },
+        rows: payloadRows,
+      };
+
+      if (mode === "existing") {
+        if (!selectedTemplateId) {
+          push({
+            type: "error",
+            message: "Nie udało się ustalić ID szablonu po nazwie.",
+          });
+          return;
+        }
+        body.templateId = selectedTemplateId;
+      } else {
+        body.templateNew = {
+          name: norm(newTemplateName),
+          items: mapping.tasks.map((t, idx) => ({
+            name: norm(t.taskName) || `Zadanie ${idx + 1}`,
+            order: idx + 1,
+            maxPoints: maxima[idx] || 1,
+            minPoints: 0,
+            content: (commonContent && norm(commonContent)) || undefined,
+            activity: (commonActivity && norm(commonActivity)) || undefined,
+            step: halves[idx] ? 0.5 : 1,
+          })),
+        };
+      }
+
+      const res = await axios.post(`${API}/imports/csv`, body, auth());
+
+      if (res.data?.structure_blocked) {
+        const reasons = Array.isArray(res.data.reasons)
+          ? res.data.reasons.join("; ")
+          : "wykryto istniejące rekordy";
+        push({
+          type: "success",
+          message: `Utworzono tylko szablon/test — struktura zablokowana: ${reasons}.`,
+        });
+      } else {
+        const classes = res.data.createdClasses ?? res.data.classes ?? 0;
+        const students = res.data.createdStudents ?? res.data.students ?? 0;
+        const results = res.data.createdResults ?? res.data.results ?? 0;
+        push({
+          type: "success",
+          message: `Gotowe. Klasy: ${classes}, uczniowie: ${students}, wyników: ${results}.`,
+        });
+      }
+
+      setOpen(false);
+      setParsed(null);
+      setMapping({ tasks: [] });
+      setSelectedTemplateName("");
+      setSelectedTemplateId(undefined);
+      setSelectedTemplateCount(undefined);
+      setNewTemplateName("");
+      setTestName("");
+      setRawNameFromCsv("");
+      setTargetSchoolId("");
     } catch (err: any) {
-      push({
-        type: "error",
-        message: err?.response?.data?.error || "Import nie powiódł się.",
-      });
+      const msg = err?.response?.data?.error || "Import nie powiódł się.";
+      push({ type: "error", message: String(msg) });
     }
   };
 
+  const miniPreviewHeaders = useMemo(() => {
+    const base = [
+      { key: mapping.classCol, label: "Klasa" },
+      { key: mapping.journalCol, label: "Nr" },
+      { key: mapping.firstNameCol, label: "Imię" },
+      { key: mapping.lastNameCol, label: "Nazwisko" },
+      { key: mapping.genderCol, label: "Płeć" },
+    ].filter((x) => x.key);
+    const taskHeads = mapping.tasks
+      .slice(0, 3)
+      .map((t, i) => ({ key: t.header, label: `Zad${i + 1}: ${t.taskName}` }));
+    return [...base, ...taskHeads] as { key: string; label: string }[];
+  }, [mapping]);
+
   return (
-    <div className="bg-white rounded-xl shadow-md p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-bold">Import wyników z CSV</h3>
-        <button
-          className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-3 py-1.5 rounded-lg"
-          onClick={openFile}
-          type="button"
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
+        type="button"
+      >
+        Importuj wyniki (CSV)
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: "rgba(30,50,60,0.18)" }}
         >
-          Wybierz plik CSV
-        </button>
-        <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
-      </div>
+          {/* Kontener modala: flex kolumna + scroll środka */}
+          <div className="bg-white rounded-xl shadow-lg min-w-[640px] w-[70%] max-w-6xl max-h-[85vh] overflow-hidden relative flex flex-col">
+            {/* X jak w TestTemplates */}
+            <button
+              onClick={() => setOpen(false)}
+              className="absolute top-4 right-4 w-9 h-9 inline-flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition"
+              aria-label="Zamknij"
+              title="Zamknij"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-2">
-          <label className="text-xs text-gray-500">Szkoła</label>
-          <select
-            value={schoolId}
-            onChange={(e) => setSchoolId(e.target.value ? Number(e.target.value) : "")}
-            className="border border-gray-300 rounded-lg px-3 py-2 bg-white"
-          >
-            <option value="">— wybierz szkołę —</option>
-            {schools.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs text-gray-500">Nazwa testu</label>
-              <input
-                className="border border-gray-300 rounded-lg px-3 py-2 w-full"
-                value={testName}
-                onChange={(e) => setTestName(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Data testu</label>
-              <input
-                type="date"
-                className="border border-gray-300 rounded-lg px-3 py-2 w-full"
-                value={testDate}
-                onChange={(e) => setTestDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="mt-3">
-            <label className="text-xs text-gray-500">Tryb szablonu</label>
-            <div className="flex items-center gap-3 mt-1">
-              <label className="flex gap-2 items-center">
-                <input
-                  type="radio"
-                  checked={!useExistingTemplate}
-                  onChange={() => setUseExistingTemplate(false)}
-                />
-                Utwórz nowy z CSV
-              </label>
-              <label className="flex gap-2 items-center">
-                <input
-                  type="radio"
-                  checked={useExistingTemplate}
-                  onChange={() => setUseExistingTemplate(true)}
-                />
-                Użyj istniejącego
-              </label>
+            {/* Header */}
+            <div className="px-7 pt-7 pb-4">
+              <div className="text-lg font-bold text-[#222B45]">
+                Import wyników z pliku CSV
+              </div>
+              <div className="text-xs text-gray-500">
+                Wybierz plik, ustaw mapowanie kolumn. Wyniki zapiszą się do
+                wskazanej szkoły.
+              </div>
             </div>
 
-            {!useExistingTemplate ? (
-              <div className="mt-2">
-                <input
-                  className="border border-gray-300 rounded-lg px-3 py-2 w-full"
-                  placeholder="Nazwa szablonu"
-                  value={templateName}
-                  onChange={(e) => setTemplateName(e.target.value)}
-                />
-                <div className="text-xs text-gray-500 mt-1">
-                  Zadania z CSV: {taskCols.join(", ") || "—"}
+            {/* Body (przewijalny) */}
+            <div className="px-7 pb-6 space-y-6 flex-1 overflow-y-auto">
+              {/* Plik + sugestia */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="sm:col-span-2">
+                  <div className={clsLabel}>Plik CSV</div>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    className={clsInput + " w-full"}
+                    onChange={onPickFile}
+                  />
+                  <div className="text-[11px] text-gray-400 mt-1">
+                    Obsługujemy średniki i przecinki (wykrywane automatycznie).
+                  </div>
+                </div>
+                <div>
+                  <div className={clsLabel}>Sugerowana nazwa z pliku</div>
+                  <div className="flex gap-2">
+                    <input
+                      className={clsInput + " flex-1"}
+                      value={rawNameFromCsv}
+                      readOnly
+                      placeholder="— brak —"
+                    />
+                    <button
+                      type="button"
+                      className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-semibold text-gray-700"
+                      onClick={() =>
+                        rawNameFromCsv && setTestName(rawNameFromCsv)
+                      }
+                      title="Skopiuj do nazwy testu"
+                    >
+                      Użyj
+                    </button>
+                  </div>
                 </div>
               </div>
-            ) : (
-              <div className="mt-2">
-                <input
-                  type="number"
-                  className="border border-gray-300 rounded-lg px-3 py-2 w-full"
-                  placeholder="ID istniejącego szablonu"
-                  value={templateId}
-                  onChange={(e) => setTemplateId(e.target.value ? Number(e.target.value) : "")}
-                />
+
+              {/* Test + Szablon + Szkoła */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="bg-[#f7fafc] rounded-xl p-4">
+                  <div className={clsLabel}>Nazwa testu (unikalna)</div>
+                  <input
+                    className={clsInput + " w-full"}
+                    placeholder="Np. Egzamin próbny — maj 2025"
+                    value={testName}
+                    onChange={(e) => setTestName(e.target.value)}
+                  />
+                  <div className="text-[11px] text-gray-400 mt-1">
+                    {testNameTaken ? (
+                      <span className="text-red-500">
+                        Taka nazwa testu już istnieje.
+                      </span>
+                    ) : (
+                      <>Jeżeli taka nazwa istnieje, import się zatrzyma.</>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-[#f7fafc] rounded-xl p-4">
+                  <div className={clsLabel}>Tryb szablonu</div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMode("existing")}
+                      className={
+                        "px-3 py-1.5 rounded-lg text-sm border " +
+                        (mode === "existing"
+                          ? "bg-teal-500 text-white border-teal-500"
+                          : "bg-white text-gray-700 border-gray-300")
+                      }
+                    >
+                      Użyj istniejącego
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode("new")}
+                      className={
+                        "px-3 py-1.5 rounded-lg text-sm border " +
+                        (mode === "new"
+                          ? "bg-teal-500 text-white border-teal-500"
+                          : "bg-white text-gray-700 border-gray-300")
+                      }
+                    >
+                      Utwórz nowy
+                    </button>
+                  </div>
+
+                  {mode === "existing" ? (
+                    <div className="mt-3 relative">
+                      <div className={clsLabel}>Wybierz szablon (po nazwie)</div>
+                      <div className="relative">
+                        <select
+                          className={clsSelect + " w-full"}
+                          value={selectedTemplateName}
+                          onChange={(e) =>
+                            setSelectedTemplateName(e.target.value)
+                          }
+                        >
+                          <option value="">— wybierz —</option>
+                          {templates.map((t) => (
+                            <option key={t.id} value={t.name}>
+                              {t.name}
+                              {t.tasksCount != null ? ` — ${t.tasksCount} z.` : ""}
+                            </option>
+                          ))}
+                        </select>
+                        <span className={caret}>
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M6 9l6 6 6-6" />
+                          </svg>
+                        </span>
+                      </div>
+                      {templateMismatch && (
+                        <div className="mt-2 text-[12px] text-red-500">
+                          Wybrany szablon ma {selectedTemplateCount} zadań, a w
+                          CSV wskazano {mapping.tasks.length}. Dopasuj liczbę
+                          kolumn zadań.
+                        </div>
+                      )}
+                      <div className="text-[11px] text-gray-500 mt-1">
+                        W tym trybie treść, czynność, limity punktów i połówki
+                        pochodzą z wybranego szablonu.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3">
+                      <div className={clsLabel}>
+                        Nazwa nowego szablonu (unikalna)
+                      </div>
+                      <input
+                        className={clsInput + " w-full"}
+                        placeholder="Np. Język polski — próba A"
+                        value={newTemplateName}
+                        onChange={(e) => setNewTemplateName(e.target.value)}
+                      />
+                      <div className="text-[11px] text-gray-500 mt-1">
+                        Treść i czynność (jeśli wskażesz kolumny poniżej) zostaną
+                        zapisane w zadaniach szablonu.
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-[#f7fafc] rounded-xl p-4">
+                  <div className={clsLabel}>Szkoła docelowa</div>
+                  <div className="relative">
+                    <select
+                      className={clsSelect + " w-full"}
+                      value={targetSchoolId}
+                      onChange={(e) =>
+                        setTargetSchoolId(
+                          e.target.value ? Number(e.target.value) : ""
+                        )
+                      }
+                    >
+                      <option value="">— wybierz —</option>
+                      {schools.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className={caret}>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-gray-500 mt-1">
+                    Wyniki zostaną przypisane do tej szkoły (walidacje
+                    duplikatów po stronie backendu).
+                  </div>
+                </div>
               </div>
-            )}
+
+              {/* Mapowanie kolumn — Uczniowie */}
+              <div className="bg-white rounded-xl border border-gray-100 p-4">
+                <div className="font-bold mb-3">
+                  Mapowanie kolumn — Uczniowie
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                  {[
+                    { label: "Oddział/Klasa", key: "classCol" as const },
+                    { label: "Nr w dzienniku / Kod", key: "journalCol" as const },
+                    { label: "Imię (opcjonalnie)", key: "firstNameCol" as const },
+                    { label: "Nazwisko (opcjonalnie)", key: "lastNameCol" as const },
+                    { label: "Płeć (opcjonalnie)", key: "genderCol" as const },
+                  ].map((f) => (
+                    <div key={f.key} className="relative">
+                      <div className={clsLabel}>{f.label}</div>
+                      <div className="relative">
+                        <select
+                          className={clsSelect + " w-full"}
+                          value={(mapping as any)[f.key] || ""}
+                          onChange={(e) =>
+                            setMapping((m) => ({
+                              ...m,
+                              [f.key]: e.target.value || undefined,
+                            }))
+                          }
+                        >
+                          <option value="">— wybierz —</option>
+                          {headerOptions.map((h) => (
+                            <option key={`${f.key}-${h}`} value={h}>
+                              {h}
+                            </option>
+                          ))}
+                        </select>
+                        <span className={caret}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M6 9l6 6 6-6" />
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mapowanie kolumn — Zadania */}
+              <div className="bg-white rounded-xl border border-gray-100 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="font-bold">
+                    Zadania ({mapping.tasks.length})
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        parsed && autoMap(parsed.headers, parsed.rows)
+                      }
+                      className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-semibold text-gray-700"
+                      title="Wykryj ponownie z nagłówków CSV"
+                    >
+                      Auto-wykryj
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!parsed) return;
+                        const firstAny = parsed.headers.find(
+                          (h) => !mapping.tasks.some((t) => t.header === h)
+                        );
+                        if (!firstAny) {
+                          push({
+                            type: "error",
+                            message: "Brak wolnych kolumn w CSV.",
+                          });
+                          return;
+                        }
+                        setMapping((m) => ({
+                          ...m,
+                          tasks: [
+                            ...m.tasks,
+                            { header: firstAny, taskName: norm(firstAny) },
+                          ],
+                        }));
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-semibold text-gray-700"
+                    >
+                      Dodaj kolumnę zadania
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead>
+                      <tr className="text-left">
+                        <th className="text-[11px] font-bold text-gray-400 uppercase py-2 pr-6">
+                          Kolumna CSV (dowolna)
+                        </th>
+                        <th className="text-[11px] font-bold text-gray-400 uppercase py-2">
+                          Nazwa zadania (wymagana)
+                        </th>
+                        <th className="w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mapping.tasks.map((t, i) => (
+                        <tr
+                          key={`${t.header}-${i}`}
+                          className="border-t border-gray-100"
+                        >
+                          <td className="py-2 pr-6">
+                            <div className="relative">
+                              <select
+                                className={clsSelect + " w-full"}
+                                value={t.header}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (
+                                    mapping.tasks.some(
+                                      (row, idx) =>
+                                        idx !== i && row.header === val
+                                    )
+                                  ) {
+                                    push({
+                                      type: "error",
+                                      message:
+                                        "Ta kolumna CSV jest już użyta w innym zadaniu.",
+                                    });
+                                    return;
+                                  }
+                                  setMapping((m) => {
+                                    const copy = [...m.tasks];
+                                    copy[i] = {
+                                      ...copy[i],
+                                      header: val,
+                                      taskName: norm(val),
+                                    };
+                                    return { ...m, tasks: copy };
+                                  });
+                                }}
+                              >
+                                {headerOptions.map((h) => (
+                                  <option key={`opt-${i}-${h}`} value={h}>
+                                    {h}
+                                  </option>
+                                ))}
+                              </select>
+                              <span className={caret}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M6 9l6 6 6-6" />
+                                </svg>
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-2">
+                            <input
+                              className={clsInput + " w-full"}
+                              value={t.taskName}
+                              placeholder="Np. 1a, 2b, 3.1…"
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setMapping((m) => {
+                                  const copy = [...m.tasks];
+                                  copy[i] = { ...copy[i], taskName: v };
+                                  return { ...m, tasks: copy };
+                                });
+                              }}
+                            />
+                          </td>
+                          <td className="py-2 text-right">
+                            <button
+                              type="button"
+                              className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
+                              onClick={() =>
+                                setMapping((m) => ({
+                                  ...m,
+                                  tasks: m.tasks.filter((_, idx) => idx !== i),
+                                }))
+                              }
+                              title="Usuń wiersz"
+                            >
+                              Usuń
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {!mapping.tasks.length && (
+                        <tr>
+                          <td className="py-6 text-gray-400" colSpan={3}>
+                            Brak wybranych kolumn zadań.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Opisy — jedna kolumna treści i jedna czynności (opcjonalnie) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                  <div className="relative">
+                    <div className={clsLabel}>Treść zadania (opcjonalnie)</div>
+                    <div className="relative">
+                      <select
+                        className={clsSelect + " w-full"}
+                        value={mapping.taskContentCol || ""}
+                        onChange={(e) =>
+                          setMapping((m) => ({
+                            ...m,
+                            taskContentCol: e.target.value || undefined,
+                          }))
+                        }
+                      >
+                        <option value="">— wybierz —</option>
+                        {headerOptions.map((h) => (
+                          <option key={`tc-${h}`} value={h}>
+                            {h}
+                          </option>
+                        ))}
+                      </select>
+                      <span className={caret}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M6 9l6 6 6-6" />
+                        </svg>
+                      </span>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <div className={clsLabel}>Czynność (opcjonalnie)</div>
+                    <div className="relative">
+                      <select
+                        className={clsSelect + " w-full"}
+                        value={mapping.taskActivityCol || ""}
+                        onChange={(e) =>
+                          setMapping((m) => ({
+                            ...m,
+                            taskActivityCol: e.target.value || undefined,
+                          }))
+                        }
+                      >
+                        <option value="">— wybierz —</option>
+                        {headerOptions.map((h) => (
+                          <option key={`ta-${h}`} value={h}>
+                            {h}
+                          </option>
+                        ))}
+                      </select>
+                      <span className={caret}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M6 9l6 6 6-6" />
+                        </svg>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mini-podgląd */}
+              {parsed && miniPreviewHeaders.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 p-4">
+                  <div className="font-bold mb-3">
+                    Mini-podgląd mapowania (3 pierwsze wiersze)
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                      <thead>
+                        <tr>
+                          {miniPreviewHeaders.map((h) => (
+                            <th
+                              key={`mp-h-${h.key}`}
+                              className="text-[11px] font-bold text-gray-400 uppercase py-2 pr-6 text-left"
+                            >
+                              {h.label}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parsed.rows.slice(0, 3).map((r, i) => (
+                          <tr
+                            key={`mp-r-${i}`}
+                            className="border-t border-gray-100"
+                          >
+                            {miniPreviewHeaders.map((h) => (
+                              <td
+                                key={`mp-c-${i}-${h.key}`}
+                                className="py-1 pr-6 text-sm text-gray-700 whitespace-nowrap"
+                              >
+                                {String(r[h.key] ?? "")}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-7 py-5 flex items-center justify-between">
+              <div className="text-xs text-gray-500">
+                {mode === "existing" && selectedTemplateName
+                  ? "Używasz istniejącego szablonu — treść/czynność i punktacja pochodzą z szablonu."
+                  : "Tworzysz nowy szablon — nazwy zadań są wymagane; treść/czynność (jeśli podasz) trafią do zadań."}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setOpen(false)}
+                  className="text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-100 transition"
+                  type="button"
+                >
+                  Anuluj
+                </button>
+                <button
+                  onClick={submit}
+                  disabled={!canImport}
+                  className={
+                    "font-semibold px-5 py-2 rounded-lg transition " +
+                    (canImport
+                      ? "bg-teal-500 hover:bg-teal-400 text-white"
+                      : "bg-gray-200 text-gray-500 cursor-not-allowed")
+                  }
+                  type="button"
+                >
+                  Importuj
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-
-        <div className="space-y-2">
-          <div className="text-xs text-gray-500">Plik: {fileName || "—"}</div>
-
-          {/* Mapowanie kolumn */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <div className="text-xs text-gray-500">Oddział / Klasa</div>
-              <select className="border border-gray-300 rounded-lg px-2 py-1 w-full" value={colClass} onChange={(e) => setColClass(e.target.value)}>
-                <option value="">— wybierz —</option>
-                {headers.map((h) => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Nr w dzienniku</div>
-              <select className="border border-gray-300 rounded-lg px-2 py-1 w-full" value={colRoll} onChange={(e) => setColRoll(e.target.value)}>
-                <option value="">— wybierz —</option>
-                {headers.map((h) => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Imię</div>
-              <select className="border border-gray-300 rounded-lg px-2 py-1 w-full" value={colFirst} onChange={(e) => setColFirst(e.target.value)}>
-                <option value="">— wybierz —</option>
-                {headers.map((h) => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Nazwisko</div>
-              <select className="border border-gray-300 rounded-lg px-2 py-1 w-full" value={colLast} onChange={(e) => setColLast(e.target.value)}>
-                <option value="">— wybierz —</option>
-                {headers.map((h) => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">PESEL / dokument (opcjonalnie)</div>
-              <select className="border border-gray-300 rounded-lg px-2 py-1 w-full" value={colPesel} onChange={(e) => setColPesel(e.target.value)}>
-                <option value="">— wybierz —</option>
-                {headers.map((h) => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-2">
-            <div className="text-xs text-gray-500">Kolumny zadań</div>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {headers.map((h) => {
-                const selected = taskCols.includes(h);
-                return (
-                  <button
-                    key={h}
-                    type="button"
-                    onClick={() =>
-                      setTaskCols((prev) =>
-                        prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]
-                      )
-                    }
-                    className={`px-2 py-1 rounded border text-xs ${
-                      selected ? "bg-teal-50 border-teal-300 text-teal-700" : "bg-white border-gray-300 text-gray-600"
-                    }`}
-                    title={selected ? "Kliknij, by odznaczyć" : "Kliknij, by traktować jako zadanie"}
-                  >
-                    {h}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="text-xs text-gray-400 mt-1">
-              Wskazówka: za zadania uznaję nagłówki pasujące do wzorca 1, 2, 15_1, 18_T itd. Możesz to zmienić klikając.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 flex justify-end">
-        <button
-          onClick={importNow}
-          className="bg-teal-500 hover:bg-teal-400 text-white font-semibold px-4 py-2 rounded-lg"
-          type="button"
-        >
-          Importuj
-        </button>
-      </div>
-    </div>
+      )}
+    </>
   );
 };
 
-export default CsvImportWizard;
+export default ImportFromResults;

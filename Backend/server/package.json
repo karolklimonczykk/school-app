@@ -17,6 +17,7 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
+    "papaparse": "^5.5.3",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.8.3"
   },
@@ -24,6 +25,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/papaparse": "^5.5.0",
     "prisma": "^6.9.0"
   }
 }

@@ -6,6 +6,7 @@ import Sidebar from "../components/Sidebar/Sidebar";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useToast } from "../components/Toast";
 import * as XLSX from "xlsx";
+import CsvImportWizard from "../components/CsvImportWizard";
 
 type School = { id: number; name: string };
 type SchoolClass = { id: number; name: string; schoolId: number };
@@ -611,6 +612,7 @@ const Results: React.FC = () => {
               Wyniki i analiza testów
             </h2>
             <div className="flex items-center gap-3">
+              <CsvImportWizard />
               <button
                 onClick={exportXLSX}
                 disabled={!overview}
