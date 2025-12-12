@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as Papa from "papaparse";
+import * as XLSX from "xlsx";
 import axios from "axios";
 import { useToast } from "./Toast";
 
@@ -324,10 +325,31 @@ const ImportFromResults: React.FC = () => {
     });
   };
 
-  const onPickFile: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const txt = await f.text();
+  const parseXlsx = async (file: File): Promise<{ headers: string[]; rows: Record<string, any>[] } | null> => {
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) {
+        push({ type: "error", message: "Plik XLSX nie zawiera arkuszy." });
+        return null;
+      }
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { defval: "" });
+      if (!jsonData.length) {
+        push({ type: "error", message: "Arkusz jest pusty." });
+        return null;
+      }
+      const headers = Object.keys(jsonData[0]).map(String);
+      return { headers, rows: jsonData };
+    } catch (err) {
+      push({ type: "error", message: `Błąd odczytu XLSX: ${err}` });
+      return null;
+    }
+  };
+
+  const parseCsv = async (file: File): Promise<{ headers: string[]; rows: Record<string, any>[]; delimiter: string } | null> => {
+    const txt = await file.text();
     const delimiter = guessDelimiter(txt);
     const res = Papa.parse(txt, {
       header: true,
@@ -336,14 +358,40 @@ const ImportFromResults: React.FC = () => {
     });
     if (res.errors?.length) {
       push({ type: "error", message: `Błąd CSV: ${res.errors[0].message}` });
-      return;
+      return null;
     }
     const headers = (res.meta.fields || []).map(String);
     const rows = (res.data as any[]).map((r) => r || {});
     if (!headers.length || !rows.length) {
       push({ type: "error", message: "Plik jest pusty lub bez nagłówka." });
-      return;
+      return null;
     }
+    return { headers, rows, delimiter };
+  };
+
+  const onPickFile: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+
+    const ext = f.name.split(".").pop()?.toLowerCase();
+    let headers: string[] = [];
+    let rows: Record<string, any>[] = [];
+    let delimiter = ",";
+
+    if (ext === "xlsx" || ext === "xls") {
+      const result = await parseXlsx(f);
+      if (!result) return;
+      headers = result.headers;
+      rows = result.rows;
+    } else {
+      // Traktuj jako CSV
+      const result = await parseCsv(f);
+      if (!result) return;
+      headers = result.headers;
+      rows = result.rows;
+      delimiter = result.delimiter;
+    }
+
     setParsed({ headers, rows, delimiter });
     autoMap(headers, rows);
   };
@@ -551,7 +599,7 @@ const ImportFromResults: React.FC = () => {
         className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
         type="button"
       >
-        Importuj wyniki (CSV)
+        Importuj wyniki
       </button>
 
       {open && (
@@ -583,10 +631,10 @@ const ImportFromResults: React.FC = () => {
             {/* Header */}
             <div className="px-7 pt-7 pb-4">
               <div className="text-lg font-bold text-[#222B45]">
-                Import wyników z pliku CSV
+                Import wyników z pliku
               </div>
               <div className="text-xs text-gray-500">
-                Wybierz plik, ustaw mapowanie kolumn. Wyniki zapiszą się do
+                Wybierz plik (CSV lub XLSX), ustaw mapowanie kolumn. Wyniki zapiszą się do
                 wskazanej szkoły.
               </div>
             </div>
@@ -596,16 +644,16 @@ const ImportFromResults: React.FC = () => {
               {/* Plik + sugestia */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-2">
-                  <div className={clsLabel}>Plik CSV</div>
+                  <div className={clsLabel}>Plik (CSV / XLSX)</div>
                   <input
                     ref={fileRef}
                     type="file"
-                    accept=".csv,text/csv"
+                    accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                     className={clsInput + " w-full"}
                     onChange={onPickFile}
                   />
                   <div className="text-[11px] text-gray-400 mt-1">
-                    Obsługujemy średniki i przecinki (wykrywane automatycznie).
+                    Obsługiwane formaty: CSV (średniki/przecinki) oraz Excel (XLSX, XLS).
                   </div>
                 </div>
                 <div>
