@@ -38,6 +38,7 @@ type StudentRow = {
   studentId: number;
   firstName: string;
   lastName: string;
+  codeNumber: string | null;
   className: string;
   schoolName: string;
   total: number;
@@ -444,6 +445,7 @@ const Results: React.FC = () => {
     // Uczniowie
     const studentsHeaderRow = aoa.push([
       "Lp.",
+      "Nr z dziennika",
       "Imię",
       "Nazwisko",
       "Klasa",
@@ -455,6 +457,7 @@ const Results: React.FC = () => {
     overview.students.forEach((s, i) => {
       aoa.push([
         i + 1,
+        s.codeNumber || "",
         s.firstName,
         s.lastName,
         s.className,
@@ -527,8 +530,8 @@ const Results: React.FC = () => {
 
     // format uczniów
     for (let r = studentsDataStart; r <= studentsDataEnd - 1; r++) {
-      const sumCell = addr(r, 5);
-      const pctCell = addr(r, 6);
+      const sumCell = addr(r, 6);
+      const pctCell = addr(r, 7);
       if (ws1[sumCell]) ws1[sumCell].z = "0.00";
       if (ws1[pctCell]) {
         ws1[pctCell].t = "n";
@@ -555,6 +558,7 @@ const Results: React.FC = () => {
     const taskCount = overview.items.length;
     const tasksOrdered = [...overview.items].sort((a, b) => a.order - b.order);
     const header2 = [
+      "Nr z dziennika",
       "Imię",
       "Nazwisko",
       ...tasksOrdered.map((t) =>
@@ -578,14 +582,15 @@ const Results: React.FC = () => {
             const v = byOrder[t.order];
             return v === null || v === undefined ? "" : Number(v);
           });
-          return [s.firstName, s.lastName, ...cols];
+          return [s.codeNumber || "", s.firstName, s.lastName, ...cols];
         } catch {
-          return [s.firstName, s.lastName, ...Array(taskCount).fill("-")];
+          return [s.codeNumber || "", s.firstName, s.lastName, ...Array(taskCount).fill("-")];
         }
       })
     );
     const ws2 = XLSX.utils.aoa_to_sheet([header2, ...pointsRows]);
     ws2["!cols"] = [
+      { wch: 14 },
       { wch: 18 },
       { wch: 22 },
       ...Array(taskCount).fill({ wch: 6 }),
@@ -1331,6 +1336,9 @@ const Results: React.FC = () => {
                               Lp.
                             </th>
                             <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
+                              NR
+                            </th>
+                            <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
                               Uczeń
                             </th>
                             <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pr-6">
@@ -1359,6 +1367,9 @@ const Results: React.FC = () => {
                                 <td className="py-4 pl-6 pr-6 text-gray-800 font-semibold">
                                   {idx + 1}
                                 </td>
+                                <td className="py-4 pr-6 text-gray-700">
+                                  {r.codeNumber || "-"}
+                                </td>
                                 <td className="py-4 pr-6 text-gray-800 font-semibold break-words">
                                   {r.firstName} {r.lastName}
                                 </td>
@@ -1377,7 +1388,7 @@ const Results: React.FC = () => {
                           {overview.students.length === 0 && (
                             <tr>
                               <td
-                                colSpan={5}
+                                colSpan={6}
                                 className="py-8 text-center text-gray-400"
                               >
                                 Brak uczniów.

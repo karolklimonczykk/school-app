@@ -31,7 +31,7 @@ router.post(
   "/schools/:schoolId/classes/:classId/students",
   authenticateJWT,
   async (req: Request, res: Response) => {
-    const { firstName, lastName, gender } = req.body;
+    const { firstName, lastName, gender, codeNumber } = req.body;
     const classId = parseInt(req.params.classId, 10);
     const schoolId = parseInt(req.params.schoolId, 10);
 
@@ -57,7 +57,7 @@ router.post(
     try {
       const count = await prisma.student.count({ where: { classId } });
       const student = await prisma.student.create({
-        data: { firstName, lastName, gender, classId, order: count + 1 },
+        data: { firstName, lastName, gender, codeNumber: codeNumber || null, classId, order: count + 1 },
       });
       res.status(201).json(student);
     } catch {
@@ -108,7 +108,7 @@ router.put(
     const schoolId = parseInt(req.params.schoolId, 10);
     const classId = parseInt(req.params.classId, 10);
     const studentId = parseInt(req.params.studentId, 10);
-    const { firstName, lastName, gender } = req.body;
+    const { firstName, lastName, gender, codeNumber } = req.body;
 
     // Sprawdź czy szkoła należy do użytkownika
     const school = await prisma.school.findUnique({ where: { id: schoolId } });
@@ -127,7 +127,7 @@ router.put(
     try {
       const updated = await prisma.student.update({
         where: { id: studentId },
-        data: { firstName, lastName, gender },
+        data: { firstName, lastName, gender, codeNumber: codeNumber !== undefined ? (codeNumber || null) : undefined },
       });
       res.json(updated);
     } catch {

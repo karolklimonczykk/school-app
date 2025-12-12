@@ -45,12 +45,12 @@ const Register: React.FC = () => {
         {/* FORMULARZ */}
         <div className="w-full md:w-3/5 flex items-center justify-center px-4">
           <div className="max-w-md w-full space-y-6 py-12">
-            <h2 className="text-3xl font-extrabold text-teal-500 mb-1">Create Account</h2>
-            <p className="text-gray-500 mb-7 text-base font-medium">Enter your email and set a password to sign up</p>
+            <h2 className="text-3xl font-extrabold text-teal-500 mb-1">Utwórz konto</h2>
+            <p className="text-gray-500 mb-7 text-base font-medium">Podaj adres e-mail i ustaw hasło, aby się zarejestrować</p>
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
                 <label htmlFor="email" className="block text-sm font-medium mb-1 text-gray-700">
-                  Email
+                  E-mail
                 </label>
                 <input
                   id="email"
@@ -59,14 +59,14 @@ const Register: React.FC = () => {
                   autoComplete="email"
                   required
                   className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-500"
-                  placeholder="Your email address"
+                  placeholder="Twój adres e-mail"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                 />
               </div>
               <div>
                 <label htmlFor="password" className="block text-sm font-medium mb-1 text-gray-700">
-                  Password
+                  Hasło
                 </label>
                 <input
                   id="password"
@@ -75,14 +75,14 @@ const Register: React.FC = () => {
                   autoComplete="new-password"
                   required
                   className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-500"
-                  placeholder="Your password"
+                  placeholder="Twoje hasło"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                 />
               </div>
               <div>
                 <label htmlFor="repeatPassword" className="block text-sm font-medium mb-1 text-gray-700">
-                  Repeat password
+                  Powtórz hasło
                 </label>
                 <input
                   id="repeatPassword"
@@ -91,7 +91,7 @@ const Register: React.FC = () => {
                   autoComplete="new-password"
                   required
                   className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-500"
-                  placeholder="Repeat your password"
+                  placeholder="Powtórz swoje hasło"
                   value={repeatPassword}
                   onChange={e => setRepeatPassword(e.target.value)}
                 />
@@ -101,7 +101,7 @@ const Register: React.FC = () => {
                 disabled={submitting}
                 className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-teal-400 hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-400 transition ${submitting ? "opacity-50 cursor-not-allowed" : ""}`}
               >
-                SIGN UP
+                Zarejestruj się
               </button>
               {message && (
                  <div
@@ -113,9 +113,9 @@ const Register: React.FC = () => {
               )}
             </form>
             <div className="text-center mt-4">
-              <span className="text-gray-500">Already have an account?</span>
+              <span className="text-gray-500">Masz już konto?</span>
               <Link to="/login" className="text-teal-500 font-bold ml-1 hover:underline">
-                Sign In
+                Zaloguj się
               </Link>
             </div>
           </div>

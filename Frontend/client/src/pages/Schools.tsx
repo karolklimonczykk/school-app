@@ -408,7 +408,7 @@ const Schools: React.FC = () => {
         <div className="w-full max-w-100% mx-auto">
           {/* Header + Akcje (import, dodanie) */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
-            <h2 className="text-2xl font-bold text-[#222B45]">Schools Table</h2>
+            <h2 className="text-2xl font-bold text-[#222B45]">Tabela szkół</h2>
             <div className="flex flex-wrap gap-2">
               <ImportFromResults onImported={fetchSchools} />
               <button
@@ -429,7 +429,7 @@ const Schools: React.FC = () => {
                 onClick={() => setShowForm(true)}
                 className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
               >
-                + Add School
+                + Dodaj szkołę
               </button>
             </div>
           </div>
@@ -472,7 +472,7 @@ const Schools: React.FC = () => {
               <thead>
                 <tr>
                   <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6">
-                    SCHOOL NAME
+                    NAZWA SZKOŁY
                   </th>
                   <th className="w-64"></th>
                 </tr>
@@ -515,14 +515,14 @@ const Schools: React.FC = () => {
                             onClick={() => handleSaveEdit(school.id)}
                             type="button"
                           >
-                            Save
+                            Zapisz
                           </button>
                           <button
                             className="text-gray-400 font-semibold px-2 py-1 hover:bg-gray-100 rounded transition"
                             onClick={handleCancelEdit}
                             type="button"
                           >
-                            Cancel
+                            Anuluj
                           </button>
                         </div>
                       ) : (
@@ -570,7 +570,7 @@ const Schools: React.FC = () => {
                 {schools.length === 0 && (
                   <tr>
                     <td colSpan={2} className="py-10 text-center text-gray-400">
-                      No schools to display.
+                      Brak szkół do wyświetlenia.
                     </td>
                   </tr>
                 )}

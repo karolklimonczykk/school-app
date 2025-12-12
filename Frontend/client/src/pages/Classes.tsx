@@ -222,7 +222,7 @@ const Classes: React.FC = () => {
         <div className="w-full max-w-10xl mx-auto">
           {/* Nagłówek + filtracja */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
-            <h2 className="text-2xl font-bold text-[#222B45]">Classes Table</h2>
+            <h2 className="text-2xl font-bold text-[#222B45]">Tabela klas</h2>
             <div className="flex gap-2">
               <div className="relative inline-block">
                 <select
@@ -270,7 +270,7 @@ const Classes: React.FC = () => {
                 }}
                 className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
               >
-                + Add Class
+                + Dodaj klasę
               </button>
             </div>
           </div>
@@ -314,10 +314,10 @@ const Classes: React.FC = () => {
               <thead>
                 <tr>
                   <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6">
-                    CLASS NAME
+                    NAZWA KLASY
                   </th>
                   <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6">
-                    SCHOOL NAME
+                    NAZWA SZKOŁY
                   </th>
                   <th className="w-40"></th>
                 </tr>
@@ -326,13 +326,13 @@ const Classes: React.FC = () => {
                 {loading ? (
                   <tr>
                     <td colSpan={3} className="py-10 text-center text-gray-400">
-                      Loading...
+                      Ładowanie...
                     </td>
                   </tr>
                 ) : classes.length === 0 ? (
                   <tr>
                     <td colSpan={3} className="py-10 text-center text-gray-400">
-                      No classes to display.
+                      Brak klas do wyświetlenia.
                     </td>
                   </tr>
                 ) : (
@@ -381,14 +381,14 @@ const Classes: React.FC = () => {
                                 onClick={() => handleSaveEdit(cls.id, cls.schoolId)}
                                 type="button"
                               >
-                                Save
+                                Zapisz
                               </button>
                               <button
                                 className="text-gray-400 font-semibold px-2 py-1 hover:bg-gray-100 rounded transition"
                                 onClick={handleCancelEdit}
                                 type="button"
                               >
-                                Cancel
+                                Anuluj
                               </button>
                             </>
                           ) : (
@@ -397,13 +397,13 @@ const Classes: React.FC = () => {
                                 className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
                                 onClick={() => handleStartEdit(cls)}
                               >
-                                Edit
+                                Edytuj
                               </button>
                               <button
                                 className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
                                 onClick={() => handleDeleteClass(cls.id, cls.schoolId)}
                               >
-                                Delete
+                                Usuń
                               </button>
                             </>
                           )}

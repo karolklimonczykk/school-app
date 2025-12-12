@@ -1054,13 +1054,13 @@ const TestTemplates: React.FC = () => {
                       className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
                       onClick={() => openEdit(template)}
                     >
-                      Edit
+                      Edytuj
                     </button>
                     <button
                       className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
                       onClick={() => handleDeleteTemplate(template.id)}
                     >
-                      Delete
+                      Usuń
                     </button>
 
                     {/* Ikonowy przycisk eksportu */}

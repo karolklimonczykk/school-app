@@ -14,7 +14,7 @@ export const linksMain = [
   //   ),
   // },
   {
-    name: "Schools",
+    name: "Szkoły",
     to: "/schools",
     icon: (
       <svg className={ICON_CLASSES} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
@@ -24,7 +24,7 @@ export const linksMain = [
     ),
   },
   {
-    name: "Classes",
+    name: "Klasy",
     to: "/classes",
     icon: (
       <svg className={ICON_CLASSES} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
@@ -34,7 +34,7 @@ export const linksMain = [
     ),
   },
   {
-    name: "Students",
+    name: "Uczniowie",
     to: "/students",
     icon: (
       <svg className={ICON_CLASSES} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
@@ -47,7 +47,7 @@ export const linksMain = [
 
 export const linksTest = [
   {
-    name: "Test templates",
+    name: "Szablony testów",
     to: "/templates",
     icon: (
       <svg className={ICON_CLASSES} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
@@ -57,7 +57,7 @@ export const linksTest = [
     ),
   },
   {
-    name: "Tests",
+    name: "Testy",
     to: "/tests",
     icon: (
       <svg className={ICON_CLASSES} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
@@ -66,7 +66,7 @@ export const linksTest = [
     ),
   },
   {
-    name: "Results",
+    name: "Wyniki",
     to: "/results",
     icon: (
       <svg className={ICON_CLASSES} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">

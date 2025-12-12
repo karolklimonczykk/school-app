@@ -12,6 +12,7 @@ type Student = {
   firstName: string;
   lastName: string;
     gender?: "M" | "K" | "N" | null;
+  codeNumber?: string | null;
   order: number;
   classId: number;
   class?: { id: number; name: string; school: School };
@@ -27,6 +28,7 @@ const Students: React.FC = () => {
     firstName: "",
     lastName: "",
     gender: "N" as "M" | "K" | "N",
+    codeNumber: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -35,6 +37,7 @@ const Students: React.FC = () => {
     firstName: "",
     lastName: "",
      gender: "N" as "M" | "K" | "N",
+    codeNumber: "",
   });
   const [showAddInput, setShowAddInput] = useState(false);
 
@@ -117,7 +120,7 @@ const Students: React.FC = () => {
   useEffect(() => {
     if (!selectedSchoolId || !selectedClassId) {
       setShowAddInput(false);
-      setNewStudent({ firstName: "", lastName: "", gender: "N" });
+      setNewStudent({ firstName: "", lastName: "", gender: "N", codeNumber: "" });
     }
   }, [selectedSchoolId, selectedClassId]);
 
@@ -197,7 +200,7 @@ const Students: React.FC = () => {
         { headers: tokenHeader() }
       );
       setStudents([...students, res.data]);
-      setNewStudent({ firstName: "", lastName: "", gender: "N" });
+      setNewStudent({ firstName: "", lastName: "", gender: "N", codeNumber: "" });
       setShowAddInput(false);
       push({ type: "success", message: "Uczeń dodany!" });
     } catch (err: unknown) {
@@ -216,6 +219,7 @@ const Students: React.FC = () => {
       firstName: student.firstName,
       lastName: student.lastName,
       gender: (student.gender ?? "N") as "M" | "K" | "N",
+      codeNumber: student.codeNumber ?? "",
     });
   };
 
@@ -239,7 +243,7 @@ const Students: React.FC = () => {
       );
 
       setEditId(null);
-      setEditStudent({ firstName: "", lastName: "", gender: "M" });
+      setEditStudent({ firstName: "", lastName: "", gender: "M", codeNumber: "" });
       push({ type: "success", message: "Uczeń zaktualizowany!" });
     } catch (err: unknown) {
       push({
@@ -253,7 +257,7 @@ const Students: React.FC = () => {
 
   const handleCancelEdit = () => {
     setEditId(null);
-    setEditStudent({ firstName: "", lastName: "", gender: "N" });
+    setEditStudent({ firstName: "", lastName: "", gender: "N", codeNumber: "" });
   };
 
   const handleDeleteStudent = async (
@@ -288,7 +292,7 @@ const Students: React.FC = () => {
     else navigate("/students");
     setShowAddInput(false);
     setEditId(null);
-    setEditStudent({ firstName: "", lastName: "", gender: "M" });
+    setEditStudent({ firstName: "", lastName: "", gender: "M", codeNumber: "" });
   };
 
   const handleFilterClass = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -300,7 +304,7 @@ const Students: React.FC = () => {
     else navigate("/students");
     setShowAddInput(false);
     setEditId(null);
-    setEditStudent({ firstName: "", lastName: "", gender: "M" });
+    setEditStudent({ firstName: "", lastName: "", gender: "M", codeNumber: "" });
   };
 
   const currentSchoolName = selectedSchoolId
@@ -318,7 +322,7 @@ const Students: React.FC = () => {
           {/* Nagłówek + filtracja */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-7 gap-4">
             <h2 className="text-2xl font-bold text-[#222B45]">
-              Students Table
+              Tabela uczniów
             </h2>
             <div className="flex gap-2 flex-wrap justify-center items-center">
               {/* SELECT SZKOŁY */}
@@ -397,7 +401,7 @@ const Students: React.FC = () => {
                 }}
                 className="bg-teal-400 hover:bg-teal-300 text-white font-semibold px-5 py-2 rounded-lg transition"
               >
-                + Add Student
+                + Dodaj ucznia
               </button>
             </div>
           </div>
@@ -437,8 +441,21 @@ const Students: React.FC = () => {
                 />
               </div>
 
+              {/* Numer z dziennika */}
+              <div className="w-full md:basis-1/6">
+                <input
+                  type="text"
+                  placeholder="Nr z dziennika"
+                  value={newStudent.codeNumber}
+                  onChange={(e) =>
+                    setNewStudent({ ...newStudent, codeNumber: e.target.value })
+                  }
+                  className="border border-gray-300 rounded-lg px-4 py-2 w-full focus:outline-none focus:border-teal-400"
+                />
+              </div>
+
               {/* Płeć */}
-              <div className="w-full md:basis-1/4 relative">
+              <div className="w-full md:basis-1/6 relative">
                 <select
                   value={newStudent.gender ?? "N"}
                   onChange={(e) =>
@@ -482,7 +499,7 @@ const Students: React.FC = () => {
                   className="text-gray-400 font-semibold hover:bg-gray-100 rounded px-4 py-2 transition"
                   onClick={() => {
                     setShowAddInput(false);
-                    setNewStudent({ firstName: "", lastName: "", gender: "N" });
+                    setNewStudent({ firstName: "", lastName: "", gender: "N", codeNumber: "" });
                   }}
                 >
                   Anuluj
@@ -497,13 +514,16 @@ const Students: React.FC = () => {
               <thead>
                 <tr>
                   <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6">
-                    STUDENT NAME
+                    UCZEŃ
                   </th>
                   <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6">
-                    SCHOOL NAME
+                    NR
                   </th>
                   <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6">
-                    CLASS NAME
+                    NAZWA SZKOŁY
+                  </th>
+                  <th className="text-xs font-bold text-gray-400 uppercase text-left py-3 pl-6">
+                    NAZWA KLASY
                   </th>
                   <th className="w-40"></th>
                 </tr>
@@ -511,14 +531,14 @@ const Students: React.FC = () => {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className="py-10 text-center text-gray-400">
-                      Loading...
+                    <td colSpan={5} className="py-10 text-center text-gray-400">
+                      Ładowanie...
                     </td>
                   </tr>
                 ) : students.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-10 text-center text-gray-400">
-                      No students to display.
+                    <td colSpan={5} className="py-10 text-center text-gray-400">
+                      Brak uczniów do wyświetlenia.
                     </td>
                   </tr>
                 ) : (
@@ -591,6 +611,23 @@ const Students: React.FC = () => {
                           </span>
                         )}
                       </td>
+                      <td className="pl-6 text-gray-500 min-w-[60px]">
+                        {editId === student.id ? (
+                          <input
+                            className="border border-gray-300 rounded-lg px-2 py-1 w-16 focus:outline-none focus:border-teal-400"
+                            value={editStudent.codeNumber}
+                            onChange={(e) =>
+                              setEditStudent({
+                                ...editStudent,
+                                codeNumber: e.target.value,
+                              })
+                            }
+                            placeholder="Nr"
+                          />
+                        ) : (
+                          student.codeNumber || "-"
+                        )}
+                      </td>
                       <td className="pl-6 text-gray-500 min-w-[180px]">
                         {student.class?.school?.name ||
                           schools.find(
@@ -624,14 +661,14 @@ const Students: React.FC = () => {
                                 }
                                 type="button"
                               >
-                                Save
+                                Zapisz
                               </button>
                               <button
                                 className="text-gray-400 font-semibold px-2 py-1 hover:bg-gray-100 rounded transition"
                                 onClick={handleCancelEdit}
                                 type="button"
                               >
-                                Cancel
+                                Anuluj
                               </button>
                             </>
                           ) : (
@@ -640,7 +677,7 @@ const Students: React.FC = () => {
                                 className="text-teal-400 font-semibold hover:bg-teal-50 rounded-md px-3 py-1 transition"
                                 onClick={() => handleStartEdit(student)}
                               >
-                                Edit
+                                Edytuj
                               </button>
                               <button
                                 className="text-red-400 font-semibold hover:bg-red-50 rounded-md px-3 py-1 transition"
@@ -655,7 +692,7 @@ const Students: React.FC = () => {
                                   )
                                 }
                               >
-                                Delete
+                                Usuń
                               </button>
                             </>
                           )}

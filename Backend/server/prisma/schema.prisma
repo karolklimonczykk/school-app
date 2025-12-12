@@ -43,14 +43,15 @@ model Class {
 }
 
 model Student {
-  id        Int       @id @default(autoincrement())
-  firstName String
-  lastName  String
-  gender    String
-  class     Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
-  classId   Int
-  order     Int
-  results   TestResult[]
+  id         Int       @id @default(autoincrement())
+  firstName  String
+  lastName   String
+  gender     String
+  codeNumber String?
+  class      Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId    Int
+  order      Int
+  results    TestResult[]
 }
 
 model TestTemplate {

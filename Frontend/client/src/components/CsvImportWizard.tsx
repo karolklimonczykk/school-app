@@ -26,6 +26,7 @@ type TaskMapRow = { header: string; taskName: string };
 type Mapping = {
   classCol?: string;
   journalCol?: string;
+  codeNumberCol?: string;
   firstNameCol?: string;
   lastNameCol?: string;
   genderCol?: string;
@@ -276,7 +277,10 @@ const ImportFromResults: React.FC = () => {
 
     const classCol = find(/^(oddział|oddzial|klasa)$/);
     const journalCol = find(
-      /^(nr w dzienniku|numer w dzienniku|dziennik|kod|id|lp)$/
+      /^(lp|pozycja|kolejność|kolejnosc|order|roll)$/
+    );
+    const codeNumberCol = find(
+      /^(nr w dzienniku|numer w dzienniku|nr z dziennika|numer z dziennika|kod|code|codenumber|identyfikator|id)$/
     );
     const firstNameCol = find(/^(imiona|imię|imie|first ?name)$/);
     const lastNameCol = find(/^(nazwisko|last ?name)$/);
@@ -291,6 +295,7 @@ const ImportFromResults: React.FC = () => {
       [
         classCol,
         journalCol,
+        codeNumberCol,
         firstNameCol,
         lastNameCol,
         genderCol,
@@ -309,6 +314,7 @@ const ImportFromResults: React.FC = () => {
     setMapping({
       classCol,
       journalCol,
+      codeNumberCol,
       firstNameCol,
       lastNameCol,
       genderCol,
@@ -433,6 +439,9 @@ const ImportFromResults: React.FC = () => {
           ? Number(String(r[mapping.journalCol]).replace(",", "."))
           : NaN;
         const roll = Number.isFinite(rollRaw) ? rollRaw : null;
+        const codeNumber = mapping.codeNumberCol
+          ? norm(r[mapping.codeNumberCol]) || null
+          : null;
         const firstName = mapping.firstNameCol
           ? norm(r[mapping.firstNameCol])
           : "";
@@ -448,7 +457,7 @@ const ImportFromResults: React.FC = () => {
           return Number.isFinite(n) ? n : null;
         });
 
-        return { className, roll, firstName, lastName, gender, taskPoints };
+        return { className, roll, codeNumber, firstName, lastName, gender, taskPoints };
       });
 
       const body: any = {
@@ -522,16 +531,17 @@ const ImportFromResults: React.FC = () => {
 
   const miniPreviewHeaders = useMemo(() => {
     const base = [
-      { key: mapping.classCol, label: "Klasa" },
-      { key: mapping.journalCol, label: "Nr" },
-      { key: mapping.firstNameCol, label: "Imię" },
-      { key: mapping.lastNameCol, label: "Nazwisko" },
-      { key: mapping.genderCol, label: "Płeć" },
+      { key: mapping.classCol, label: "Klasa", id: "class" },
+      { key: mapping.journalCol, label: "Poz.", id: "journal" },
+      { key: mapping.codeNumberCol, label: "Kod", id: "code" },
+      { key: mapping.firstNameCol, label: "Imię", id: "fname" },
+      { key: mapping.lastNameCol, label: "Nazwisko", id: "lname" },
+      { key: mapping.genderCol, label: "Płeć", id: "gender" },
     ].filter((x) => x.key);
     const taskHeads = mapping.tasks
       .slice(0, 3)
-      .map((t, i) => ({ key: t.header, label: `Zad${i + 1}: ${t.taskName}` }));
-    return [...base, ...taskHeads] as { key: string; label: string }[];
+      .map((t, i) => ({ key: t.header, label: `Zad${i + 1}: ${t.taskName}`, id: `task-${i}` }));
+    return [...base, ...taskHeads] as { key: string; label: string; id: string }[];
   }, [mapping]);
 
   return (
@@ -777,10 +787,11 @@ const ImportFromResults: React.FC = () => {
                 <div className="font-bold mb-3">
                   Mapowanie kolumn — Uczniowie
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
                   {[
                     { label: "Oddział/Klasa", key: "classCol" as const },
-                    { label: "Nr w dzienniku / Kod", key: "journalCol" as const },
+                    { label: "Nr w dzienniku (pozycja)", key: "journalCol" as const },
+                    { label: "Nr z dziennika (kod)", key: "codeNumberCol" as const },
                     { label: "Imię (opcjonalnie)", key: "firstNameCol" as const },
                     { label: "Nazwisko (opcjonalnie)", key: "lastNameCol" as const },
                     { label: "Płeć (opcjonalnie)", key: "genderCol" as const },
@@ -1039,7 +1050,7 @@ const ImportFromResults: React.FC = () => {
                         <tr>
                           {miniPreviewHeaders.map((h) => (
                             <th
-                              key={`mp-h-${h.key}`}
+                              key={`mp-h-${h.id}`}
                               className="text-[11px] font-bold text-gray-400 uppercase py-2 pr-6 text-left"
                             >
                               {h.label}
@@ -1055,7 +1066,7 @@ const ImportFromResults: React.FC = () => {
                           >
                             {miniPreviewHeaders.map((h) => (
                               <td
-                                key={`mp-c-${i}-${h.key}`}
+                                key={`mp-c-${i}-${h.id}`}
                                 className="py-1 pr-6 text-sm text-gray-700 whitespace-nowrap"
                               >
                                 {String(r[h.key] ?? "")}

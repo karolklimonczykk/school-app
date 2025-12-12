@@ -39,12 +39,12 @@ const Login: React.FC = () => {
         {/* LEFT PANEL */}
         <div className="w-full md:w-3/5 flex items-center justify-center px-4">
           <div className="max-w-md w-full space-y-6 py-12">
-            <h2 className="text-3xl font-extrabold text-teal-500 mb-1">Welcome Back</h2>
-            <p className="text-gray-500 mb-7 text-base font-medium">Enter your email and password to sign in</p>
+            <h2 className="text-3xl font-extrabold text-teal-500 mb-1">Witaj ponownie</h2>
+            <p className="text-gray-500 mb-7 text-base font-medium">Wpisz adres e-mail i hasło, aby się zalogować</p>
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
                 <label htmlFor="email" className="block text-sm font-medium mb-1 text-gray-700">
-                  Email
+                  E-mail
                 </label>
                 <input
                   id="email"
@@ -53,14 +53,14 @@ const Login: React.FC = () => {
                   autoComplete="email"
                   required
                   className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-500"
-                  placeholder="Your email address"
+                  placeholder="Twój adres e-mail"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                 />
               </div>
               <div>
                 <label htmlFor="password" className="block text-sm font-medium mb-1 text-gray-700">
-                  Password
+                  Hasło
                 </label>
                 <input
                   id="password"
@@ -69,7 +69,7 @@ const Login: React.FC = () => {
                   autoComplete="current-password"
                   required
                   className="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-500"
-                  placeholder="Your password"
+                  placeholder="Twoje hasło"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                 />
@@ -92,23 +92,23 @@ const Login: React.FC = () => {
                       }`}
                     ></div>
                   </div>
-                  <span className="ml-3 text-sm text-gray-700 select-none">Remember me</span>
+                  <span className="ml-3 text-sm text-gray-700 select-none">Zapamiętaj mnie</span>
                 </label>
               </div>
               <button
                 type="submit"
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-teal-400 hover:bg-teal-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-400 transition"
               >
-                SIGN IN
+                Zaloguj się
               </button>
               {message && (
                 <div className="text-center text-red-500 font-medium">{message}</div>
               )}
             </form>
             <div className="text-center mt-4">
-              <span className="text-gray-500">Don't have an account?</span>
+              <span className="text-gray-500">Nie masz jeszcze konta?</span>
               <Link to="/register" className="text-teal-500 font-bold ml-1 hover:underline">
-                Sign Up
+                Zarejestruj się
               </Link>
             </div>
           </div>

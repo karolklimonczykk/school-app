@@ -28,6 +28,7 @@ const router = express.Router();
  *   rows: Array<{
  *     className?: string|null,
  *     roll?: number|null,
+ *     codeNumber?: string|null,
  *     firstName?: string|null,
  *     lastName?: string|null,
  *     gender?: string|null,
@@ -65,6 +66,7 @@ router.post("/csv", authenticateJWT, async (req: Request, res: Response): Promis
     rows: {
       className?: string | null;
       roll?: number | null;
+      codeNumber?: string | null;
       firstName?: string | null;
       lastName?: string | null;
       gender?: string | null;
@@ -231,6 +233,7 @@ router.post("/csv", authenticateJWT, async (req: Request, res: Response): Promis
 
   const findOrCreateStudent = async (classId: number, row: any) => {
     const roll = typeof row.roll === "number" && Number.isFinite(row.roll) ? row.roll : null;
+    const codeNumber = row.codeNumber ? norm(row.codeNumber) : null;
     const firstName = norm(row.firstName);
     const lastName = norm(row.lastName);
     const gender = ["M", "F"].includes((row.gender || "N").toString()) ? row.gender : "N";
@@ -250,6 +253,7 @@ router.post("/csv", authenticateJWT, async (req: Request, res: Response): Promis
           gender: gender as any,
           firstName: firstName || undefined,
           lastName: lastName || undefined,
+          codeNumber: codeNumber || undefined,
         },
       });
       return studentId;
@@ -263,6 +267,7 @@ router.post("/csv", authenticateJWT, async (req: Request, res: Response): Promis
         firstName: firstName || "",
         lastName: lastName || "",
         gender: (gender as any) || "N",
+        codeNumber: codeNumber || null,
       },
       select: { id: true },
     });

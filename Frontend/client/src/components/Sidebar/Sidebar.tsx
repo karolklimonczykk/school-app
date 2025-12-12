@@ -190,7 +190,7 @@ const Sidebar: React.FC = () => {
             >
               {LogoutIcon}
             </span>
-            <span className="transition">Logout</span>
+            <span className="transition">Wyloguj</span>
           </button>
         </div>
         {isMobile && (
