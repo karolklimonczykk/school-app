@@ -1,5 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
 // components/Sidebar/sidebarLinks.tsx
-import React from "react";
 export const ICON_CLASSES = "w-5 h-5 transition-colors duration-150";
 
 export const linksMain = [
