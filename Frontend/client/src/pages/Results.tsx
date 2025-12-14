@@ -6,7 +6,7 @@ import Sidebar from "../components/Sidebar/Sidebar";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useToast } from "../components/Toast";
 import * as XLSX from "xlsx";
-import CsvImportWizard from "../components/CsvImportWizard";
+import CsvImportWizard from "../components/ImportWizard";
 
 type School = { id: number; name: string };
 type SchoolClass = { id: number; name: string; schoolId: number };

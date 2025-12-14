@@ -262,10 +262,7 @@ const ImportFromResults: React.FC = () => {
     )}-${String(d.getDate()).padStart(2, "0")}`;
   };
 
-  const autoMap = (
-    headers: string[],
-    rows: Array<Record<string, any>>
-  ) => {
+  const autoMap = (headers: string[], rows: Array<Record<string, any>>) => {
     const L = headers.map((h) => lower(h));
     const find = (...cands: RegExp[]) => {
       const idx = L.findIndex((h) => cands.some((r) => r.test(h)));
@@ -277,33 +274,18 @@ const ImportFromResults: React.FC = () => {
     if (!norm(testName)) setTestName(sug);
 
     const classCol = find(/^(oddział|oddzial|klasa)$/);
-    const journalCol = find(
-      /^(lp|pozycja|kolejność|kolejnosc|order|roll)$/
-    );
+    const journalCol = find(/^(lp|pozycja|kolejność|kolejnosc|order|roll)$/);
     const codeNumberCol = find(
       /^(nr w dzienniku|numer w dzienniku|nr z dziennika|numer z dziennika|kod|code|codenumber|identyfikator|id)$/
     );
     const firstNameCol = find(/^(imiona|imię|imie|first ?name)$/);
     const lastNameCol = find(/^(nazwisko|last ?name)$/);
     const genderCol = find(/^(płeć|plec|gender|sex)$/);
-
     const taskContentCol = find(/^(treść zadania|tresc zadania|opis|temat)$/);
-    const taskActivityCol = find(
-      /^(czynność|czynnosc|opis czynności|opis czynnosc)$/
-    );
+    const taskActivityCol = find(/^(czynność|czynnosc|opis czynności|opis czynnosc)$/);
 
-    const banned = new Set(
-      [
-        classCol,
-        journalCol,
-        codeNumberCol,
-        firstNameCol,
-        lastNameCol,
-        genderCol,
-        taskContentCol,
-        taskActivityCol,
-      ].filter(Boolean) as string[]
-    );
+    const banned = new Set([classCol,journalCol,codeNumberCol,firstNameCol,lastNameCol,genderCol,taskContentCol,
+      taskActivityCol,].filter(Boolean) as string[]);
     const hinted = headers.filter((h) => !banned.has(h) && looksLikeTask(h));
     const tasks: TaskMapRow[] = hinted.length
       ? hinted.map((h) => ({ header: h, taskName: norm(h) }))
@@ -312,17 +294,7 @@ const ImportFromResults: React.FC = () => {
           .slice(0, 3)
           .map((h) => ({ header: h, taskName: norm(h) }));
 
-    setMapping({
-      classCol,
-      journalCol,
-      codeNumberCol,
-      firstNameCol,
-      lastNameCol,
-      genderCol,
-      taskContentCol,
-      taskActivityCol,
-      tasks,
-    });
+    setMapping({classCol,journalCol,codeNumberCol,firstNameCol,lastNameCol,genderCol,taskContentCol,taskActivityCol,tasks,});
   };
 
   const parseXlsx = async (file: File): Promise<{ headers: string[]; rows: Record<string, any>[] } | null> => {
@@ -351,11 +323,7 @@ const ImportFromResults: React.FC = () => {
   const parseCsv = async (file: File): Promise<{ headers: string[]; rows: Record<string, any>[]; delimiter: string } | null> => {
     const txt = await file.text();
     const delimiter = guessDelimiter(txt);
-    const res = Papa.parse(txt, {
-      header: true,
-      delimiter,
-      skipEmptyLines: "greedy",
-    });
+    const res = Papa.parse(txt, {header: true, delimiter, skipEmptyLines: "greedy",});
     if (res.errors?.length) {
       push({ type: "error", message: `Błąd CSV: ${res.errors[0].message}` });
       return null;
@@ -384,7 +352,6 @@ const ImportFromResults: React.FC = () => {
       headers = result.headers;
       rows = result.rows;
     } else {
-      // Traktuj jako CSV
       const result = await parseCsv(f);
       if (!result) return;
       headers = result.headers;

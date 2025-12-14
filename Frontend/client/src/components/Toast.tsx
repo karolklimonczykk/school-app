@@ -68,10 +68,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode; max?: number }
   );
 };
 
-const variantClasses: Record<
-  ToastType,
-  { card: string; icon: string; barBg: string; barFill: string; close: string }
-> = {
+const variantClasses: Record<ToastType,{ card: string; icon: string; barBg: string; barFill: string; close: string }> = {
   success: {
     card: "bg-teal-50 text-teal-900 border border-teal-200 shadow-teal-200/50",
     icon: "text-teal-600",
