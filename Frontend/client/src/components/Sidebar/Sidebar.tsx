@@ -149,7 +149,7 @@ const Sidebar: React.FC = () => {
               fontSize: "0.8rem",
             }}
           >
-            TEST PAGES
+            SEKCJA TESTÓW
           </p>
           <ul className="flex flex-col gap-[14px] mt-6">
             <SidebarLinks
