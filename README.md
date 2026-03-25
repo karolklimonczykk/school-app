@@ -1,19 +1,8 @@
-# 🏫 A web-based system supporting teachers in evaluating and analyzing school test results
+# 🏫 School Test Analysis System
 
 This project is a web application designed to support teachers in managing school data and analyzing test results. The system organizes the full workflow (from school and class structure to reporting), replacing manual spreadsheet-based operations.
 
 The application automates statistical calculations and educational measurement indicators, enabling faster and more objective interpretation of outcomes. Thanks to per-user data separation, each teacher works on an isolated set of schools, classes, and results.
-
-## 🎯 Project Goal and Scope
-
-The main goal of this engineering project is to replace fragmented, manually maintained spreadsheets with a coherent web system for:
-- organizing school data (schools, classes, students),
-- managing tests and scoring rules,
-- collecting results in a structured way,
-- automatically calculating key statistical and psychometric indicators,
-- presenting outcomes as tables and charts for diagnostic decision-making.
-
-The system is designed for browser-based usage, with no additional software required for end users.
 
 ## ✨ Main Features
 
@@ -25,12 +14,11 @@ The system is designed for browser-based usage, with no additional software requ
 ### School structure management
 - Full CRUD for schools, classes, and students
 - Filtering by school and class
-- Optional student code/identifier (`codeNumber`)
 
 ### Test templates and tasks
 - Template CRUD with ordered tasks
 - Task configuration: name, activity, content, min/max points
-- Optional half-point scoring (`allowHalfPoints`)
+- Optional half-point scoring
 - Template import/export support (XLSX in UI workflows)
 
 ### Test sessions and scoring
@@ -72,26 +60,28 @@ The system calculates indicators at both test level and item level.
 - Variance
 - Discrimination power (`r`) using Pearson correlation against corrected total score
 
-## 🧰 Technologies
+## 🖥️ Tech Stack
 
-### Frontend
-- React 19
-- TypeScript
-- Vite
+### 🎨 Frontend
+- React 19 (Typescript + Vite)
 - Tailwind CSS 4
 - Axios
 - PapaParse, XLSX
 
-### Backend
+### 🔙 Backend
 - Node.js
 - Express
 - TypeScript
 - Prisma ORM
 - JWT (`jsonwebtoken`), `bcryptjs`
 
-### Database
+### 🗄️ Database
 - PostgreSQL
-
+  
+### ⚙️ DevOps / Tools / Environments used
+- Docker (database)
+- Visual Studio Code
+  
 ## 🏗️ System Architecture
 
 The system follows a client–server architecture:
@@ -100,21 +90,8 @@ The system follows a client–server architecture:
 - data is stored in a relational PostgreSQL database,
 - data access is restricted to resource owners (`ownerId`).
 
-### Domain Diagram
-
-```mermaid
-erDiagram
-   User ||--o{ School : owns
-   School ||--o{ Class : contains
-   Class ||--o{ Student : contains
-   User ||--o{ TestTemplate : creates
-   TestTemplate ||--o{ TestTask : contains
-   User ||--o{ Test : runs
-   TestTemplate ||--o{ Test : base_for
-   Test ||--o{ TestResult : has
-   Student ||--o{ TestResult : receives
-   TestTask ||--o{ TestResult : evaluates
-```
+### Database Diagram
+<p align="center"><img src="https://i.imgur.com/eOLLHWT.png" alt="diagram-erd" /></p>
 
 ## 🔐 Security and Data Isolation
 
@@ -224,52 +201,47 @@ school-app/
 > Most endpoints (except register/login) require:  
 > `Authorization: Bearer <token>`
 
-## 🧪 Example Usage
-
-### 1) Register a user
-```http
-POST /auth/register
-Content-Type: application/json
-
-{
-   "email": "teacher@example.com",
-   "password": "Password123!"
-}
-```
-
-### 2) Login and get token
-```http
-POST /auth/login
-Content-Type: application/json
-
-{
-   "email": "teacher@example.com",
-   "password": "Password123!"
-}
-```
-
-### 3) Add a school
-```http
-POST /schools
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-   "name": "Primary School No. 1"
-}
-```
-
-### 4) Fetch test result analysis
-```http
-GET /results/overview?testId=1&schoolId=1&classId=2
-Authorization: Bearer <token>
-```
-
 ## 📝 Practical Notes
 
 - The importer is optimized for real-world spreadsheet variability (different delimiters and column labels).
 - During CSV import, the backend prevents accidental structure duplication in selected scenarios.
 - Results can be analyzed globally or with narrowed scope (school/class/student) for diagnostic use.
+
+## 📸 Screenshots
+
+<p>Registration</p>
+<p align="center"><img src="https://i.imgur.com/44uAWs0.png" /></p>
+<p>Login</p>
+<p align="center"><img src="https://i.imgur.com/2DnlywL.png" /> </p>
+<p>Schools view</p>
+<p align="center"><img src="https://i.imgur.com/UsC4qN7.png" /></p>
+<p>Classes view</p>
+<p align="center"><img src="https://i.imgur.com/xPpX0RF.png" /></p>
+<p>Students view</p>
+<p align="center"><img src="https://i.imgur.com/SKjTdAV.png" /></p>
+<p align="center"><img src="https://i.imgur.com/PrPHWdf.png" /></p>
+<p>Test template view</p>
+<p align="center"><img src="https://i.imgur.com/xcmZV0L.png" /></p>
+<p>Test template view - adding</p>
+<p align="center"><img src="https://i.imgur.com/6Kjrqfw.png" /></p>
+<p>Test template view - editing</p>
+<p><img src="https://i.imgur.com/AWWV4Lg.png"/></p>
+<p>Tests view - chosing session</p>
+<p align="center"><img src="https://i.imgur.com/wEdtdcY.png" /></p>
+<p>Tests view - adding session + example of validation</p>
+<p align="center"><img src="https://i.imgur.com/9oK5fge.png" /></p>
+<p>Tests view - completing the test</p>
+<p align="center"><img src="https://i.imgur.com/j7Kd6CJ.png" /></p>
+<p>Results view - tasks</p>
+<p align="center"><img src="https://i.imgur.com/33bm67m.png" /></p>
+<p align="center"><img src="https://i.imgur.com/EDOyz84.png" /></p>
+<p>Results view - students</p>
+<p align="center"><img src="https://i.imgur.com/KfPUZkl.png" /></p>
+<p align="center"><img src="https://i.imgur.com/U8ELOZY.png" /></p>
+<p>Import wizard modal</p>
+<p align="center"><img src="https://i.imgur.com/U20J8mm.png" /></p>
+<p align="center"><img src="https://i.imgur.com/i3diVfr.png" /></p>
+<p align="center"><img src="https://i.imgur.com/I5obrAR.png" /></p>
 
 ## 🔮 Future Improvements
 
