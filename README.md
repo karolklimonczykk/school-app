@@ -1,25 +1,76 @@
-# 🏫 Web System Supporting Teachers in Evaluation and Analysis of School Test Results
+# 🏫 A web-based system supporting teachers in evaluating and analyzing school test results
 
 This project is a web application designed to support teachers in managing school data and analyzing test results. The system organizes the full workflow (from school and class structure to reporting), replacing manual spreadsheet-based operations.
 
 The application automates statistical calculations and educational measurement indicators, enabling faster and more objective interpretation of outcomes. Thanks to per-user data separation, each teacher works on an isolated set of schools, classes, and results.
 
+## 🎯 Project Goal and Scope
+
+The main goal of this engineering project is to replace fragmented, manually maintained spreadsheets with a coherent web system for:
+- organizing school data (schools, classes, students),
+- managing tests and scoring rules,
+- collecting results in a structured way,
+- automatically calculating key statistical and psychometric indicators,
+- presenting outcomes as tables and charts for diagnostic decision-making.
+
+The system is designed for browser-based usage, with no additional software required for end users.
+
 ## ✨ Main Features
 
+### Authentication and account
 - User registration and login (JWT)
-- School, class, and student management (CRUD)
-- Test template and task creation
-- Test session creation and management
-- Student score entry per task
-- Data import and export (CSV/XLSX)
-- Test and task analysis (tables + charts)
-- Statistical and psychometric indicators, including:
-  - mean, median, mode,
-  - variance and standard deviation,
-  - item ease/difficulty index,
-  - item discrimination power,
-  - test reliability (Cronbach’s alpha),
-  - standard error of measurement.
+- Protected routes in frontend and backend
+- Stateless API authorization via `Authorization: Bearer <token>`
+
+### School structure management
+- Full CRUD for schools, classes, and students
+- Filtering by school and class
+- Optional student code/identifier (`codeNumber`)
+
+### Test templates and tasks
+- Template CRUD with ordered tasks
+- Task configuration: name, activity, content, min/max points
+- Optional half-point scoring (`allowHalfPoints`)
+- Template import/export support (XLSX in UI workflows)
+
+### Test sessions and scoring
+- Create/load/rename/delete test sessions
+- Enter and edit points per student and per task
+- Validation against template scoring rules
+- Progress tracking for score completion
+
+### Import/export and interoperability
+- CSV/XLSX import wizard with:
+   - automatic header detection,
+   - manual mapping override,
+   - preview before import,
+   - support for existing template or new template creation.
+- XLSX export of analytical results and summaries
+
+### Analysis and visualization
+- Task-level analysis with charts and tables
+- Student-level analysis with points/percent views
+- Dynamic filtering by school, class, and student
+- Statistical and psychometric indicators (see section below)
+
+## 📊 Implemented Statistical & Psychometric Indicators
+
+The system calculates indicators at both test level and item level.
+
+### Test-level
+- Mean, median, mode
+- Min, max, range
+- Variance, standard deviation
+- Test easiness index (`pTest`)
+- Reliability: Cronbach’s alpha (`alpha`)
+- Standard error of measurement (`SEM` / `stdError`)
+
+### Item-level
+- Average points per task
+- Easiness index (`p`) and difficulty index (`q = 1 - p`)
+- Omission fraction (`f`)
+- Variance
+- Discrimination power (`r`) using Pearson correlation against corrected total score
 
 ## 🧰 Technologies
 
@@ -65,6 +116,13 @@ erDiagram
    TestTask ||--o{ TestResult : evaluates
 ```
 
+## 🔐 Security and Data Isolation
+
+- Each protected request is authenticated with JWT.
+- Backend verifies ownership (`ownerId`) for accessed resources.
+- Users can only view and modify their own schools, classes, students, templates, tests, and results.
+- Data model and API logic enforce tenant separation at query level.
+
 ## 🚀 Getting Started (Step by Step)
 
 ### 1. Clone the repository
@@ -104,6 +162,15 @@ npm run dev
 ```
 
 Frontend default URL: `http://localhost:5173`.
+
+## 🧭 Typical User Workflow
+
+1. Register and log in.
+2. Create school structure (schools → classes → students).
+3. Build a test template with tasks and scoring rules.
+4. Create/load a test session.
+5. Enter scores manually or import CSV/XLSX.
+6. Analyze metrics and export report data to XLSX.
 
 ## 📁 Project Structure
 
@@ -198,6 +265,12 @@ GET /results/overview?testId=1&schoolId=1&classId=2
 Authorization: Bearer <token>
 ```
 
+## 📝 Practical Notes
+
+- The importer is optimized for real-world spreadsheet variability (different delimiters and column labels).
+- During CSV import, the backend prevents accidental structure duplication in selected scenarios.
+- Results can be analyzed globally or with narrowed scope (school/class/student) for diagnostic use.
+
 ## 🔮 Future Improvements
 
 - PDF export and print-ready report templates
@@ -210,4 +283,13 @@ Authorization: Bearer <token>
 ## 👤 Author
 
 **Karol Klimończyk**  
-Engineering thesis project: *Web System Supporting Teachers in Evaluation and Analysis of School Test Results*
+Engineering thesis project: *A web-based system supporting teachers in evaluating and analyzing school test results*
+
+### Academic Information
+
+- **University:** Cracow University of Technology (Politechnika Krakowska im. T. Kościuszki)
+- **Faculty:** Faculty of Mechanical Engineering
+- **Department:** Department of Applied Computer Science (Katedra Informatyki Stosowanej)
+- **Degree program:** Applied Computer Science (Informatyka Stosowana), full-time engineering studies
+- **Supervisor:** dr inż. Paweł Lempa
+- **Academic year:** 2025/2026
