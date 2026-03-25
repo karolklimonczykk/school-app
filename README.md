@@ -80,6 +80,7 @@ The system calculates indicators at both test level and item level.
   
 ### ⚙️ DevOps / Tools / Environments used
 - Docker (database)
+- Postman (API)
 - Visual Studio Code
   
 ## 🏗️ System Architecture
