@@ -245,11 +245,7 @@ school-app/
 <p align="center"><img src="https://i.imgur.com/I5obrAR.png" /></p>
 
 ## 🎬 Application Demo (click to watch)
-<p align="center">
-  <a href="https://youtu.be/qXW49vxAL9U" target="_blank">
-    <img src="https://i.imgur.com/2DnlywL.png" width="700"/>
-  </a>
-</p>
+[![Watch demo](https://i.imgur.com/2DnlywL.png)](https://youtu.be/qXW49vxAL9U)
 
 ## 🔮 Future Improvements
 
