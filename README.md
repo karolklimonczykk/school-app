@@ -1,8 +1,16 @@
+![React](https://img.shields.io/badge/frontend-React-blue)
+![Node](https://img.shields.io/badge/backend-Node.js-green)
+![PostgreSQL](https://img.shields.io/badge/database-PostgreSQL-blue)
 # 🏫 School Test Analysis System
+
+> Web application for teachers to analyze test results with automated statistical insights and visual reports.
 
 This project is a web application designed to support teachers in managing school data and analyzing test results. The system organizes the full workflow (from school and class structure to reporting), replacing manual spreadsheet-based operations.
 
 The application automates statistical calculations and educational measurement indicators, enabling faster and more objective interpretation of outcomes. Thanks to per-user data separation, each teacher works on an isolated set of schools, classes, and results.
+
+## 🎬 Application Demo (click to watch)
+[![Watch demo](https://i.imgur.com/2DnlywL.png)](https://youtu.be/qXW49vxAL9U)
 
 ## ✨ Main Features
 
@@ -141,15 +149,6 @@ npm run dev
 
 Frontend default URL: `http://localhost:5173`.
 
-## 🧭 Typical User Workflow
-
-1. Register and log in.
-2. Create school structure (schools → classes → students).
-3. Build a test template with tasks and scoring rules.
-4. Create/load a test session.
-5. Enter scores manually or import CSV/XLSX.
-6. Analyze metrics and export report data to XLSX.
-
 ## 📁 Project Structure
 
 ```text
@@ -202,18 +201,16 @@ school-app/
 > Most endpoints (except register/login) require:  
 > `Authorization: Bearer <token>`
 
-## 📝 Practical Notes
-
-- The importer is optimized for real-world spreadsheet variability (different delimiters and column labels).
-- During CSV import, the backend prevents accidental structure duplication in selected scenarios.
-- Results can be analyzed globally or with narrowed scope (school/class/student) for diagnostic use.
-
 ## 📸 Screenshots
+### 🔐 Authentication
 
 <p>Registration</p>
 <p align="center"><img src="https://i.imgur.com/44uAWs0.png" /></p>
 <p>Login</p>
 <p align="center"><img src="https://i.imgur.com/2DnlywL.png" /> </p>
+
+### 🏫 School Management
+
 <p>Schools view</p>
 <p align="center"><img src="https://i.imgur.com/UsC4qN7.png" /></p>
 <p>Classes view</p>
@@ -221,31 +218,45 @@ school-app/
 <p>Students view</p>
 <p align="center"><img src="https://i.imgur.com/SKjTdAV.png" /></p>
 <p align="center"><img src="https://i.imgur.com/PrPHWdf.png" /></p>
+
+### 📝 Test Templates
+
 <p>Test template view</p>
 <p align="center"><img src="https://i.imgur.com/xcmZV0L.png" /></p>
 <p>Test template view - adding</p>
 <p align="center"><img src="https://i.imgur.com/6Kjrqfw.png" /></p>
 <p>Test template view - editing</p>
 <p><img src="https://i.imgur.com/AWWV4Lg.png"/></p>
+
+### 🧪 Test Sessions
+
 <p>Tests view - chosing session</p>
 <p align="center"><img src="https://i.imgur.com/wEdtdcY.png" /></p>
 <p>Tests view - adding session + example of validation</p>
 <p align="center"><img src="https://i.imgur.com/9oK5fge.png" /></p>
 <p>Tests view - completing the test</p>
 <p align="center"><img src="https://i.imgur.com/j7Kd6CJ.png" /></p>
+
+### 📊 Analysis & Results
+
 <p>Results view - tasks</p>
 <p align="center"><img src="https://i.imgur.com/33bm67m.png" /></p>
 <p align="center"><img src="https://i.imgur.com/EDOyz84.png" /></p>
 <p>Results view - students</p>
 <p align="center"><img src="https://i.imgur.com/KfPUZkl.png" /></p>
 <p align="center"><img src="https://i.imgur.com/U8ELOZY.png" /></p>
-<p>Import wizard modal</p>
+
+### 📥 Import Wizard
+
 <p align="center"><img src="https://i.imgur.com/U20J8mm.png" /></p>
 <p align="center"><img src="https://i.imgur.com/i3diVfr.png" /></p>
 <p align="center"><img src="https://i.imgur.com/I5obrAR.png" /></p>
 
-## 🎬 Application Demo (click to watch)
-[![Watch demo](https://i.imgur.com/2DnlywL.png)](https://youtu.be/qXW49vxAL9U)
+## 📝 Practical Notes
+
+- The importer is optimized for real-world spreadsheet variability (different delimiters and column labels).
+- During CSV import, the backend prevents accidental structure duplication in selected scenarios.
+- Results can be analyzed globally or with narrowed scope (school/class/student) for diagnostic use.
 
 ## 🔮 Future Improvements
 
