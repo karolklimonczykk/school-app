@@ -9,8 +9,8 @@ This project is a web application designed to support teachers in managing schoo
 
 The application automates statistical calculations and educational measurement indicators, enabling faster and more objective interpretation of outcomes. Thanks to per-user data separation, each teacher works on an isolated set of schools, classes, and results.
 
-## 🎬 Application Demo (click to watch)
-[![Watch demo](https://i.imgur.com/2DnlywL.png)](https://youtu.be/qXW49vxAL9U)
+## 🎬 Application Demo
+[![Watch demo](https://i.imgur.com/2DnlywL.png)](https://github.com/user-attachments/assets/3c72134a-b1d8-4452-9674-3894ab9fd777)
 
 ## ✨ Main Features
 
