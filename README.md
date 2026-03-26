@@ -113,7 +113,7 @@ The system follows a client–server architecture:
 
 ### 1. Clone the repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/karolklimonczykk/school-app
 cd school-app
 ```
 
